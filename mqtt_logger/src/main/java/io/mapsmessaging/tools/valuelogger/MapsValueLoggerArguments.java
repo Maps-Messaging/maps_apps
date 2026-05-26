@@ -9,16 +9,19 @@ public class MapsValueLoggerArguments {
   private final String topic;
   private final int qos;
   private final String outputFileName;
+  private final OutputFormat outputFormat;
 
   private MapsValueLoggerArguments(
       String url,
       String topic,
       int qos,
-      String outputFileName) {
+      String outputFileName,
+      OutputFormat outputFormat) {
     this.url = url;
     this.topic = topic;
     this.qos = qos;
     this.outputFileName = outputFileName;
+    this.outputFormat = outputFormat;
   }
 
   public static MapsValueLoggerArguments parse(String[] args) {
@@ -26,6 +29,7 @@ public class MapsValueLoggerArguments {
     String topic = null;
     Integer qos = null;
     String outputFileName = null;
+    OutputFormat requestedOutputFormat = null;
 
     for (int index = 0; index < args.length; index++) {
       String argument = args[index];
@@ -48,6 +52,11 @@ public class MapsValueLoggerArguments {
           outputFileName = readRequiredValue(args, ++index, "--output");
           break;
 
+        case "--format":
+          String formatText = readRequiredValue(args, ++index, "--format");
+          requestedOutputFormat = OutputFormat.parse(formatText);
+          break;
+
         default:
           throw new IllegalArgumentException("Unknown argument: " + argument);
       }
@@ -65,15 +74,23 @@ public class MapsValueLoggerArguments {
       throw new IllegalArgumentException("Missing required argument: --qos");
     }
 
-    return new MapsValueLoggerArguments(url, topic, qos, outputFileName);
+    OutputFormat resolvedOutputFormat = OutputFormat.resolve(outputFileName, requestedOutputFormat);
+
+    return new MapsValueLoggerArguments(
+        url,
+        topic,
+        qos,
+        outputFileName,
+        resolvedOutputFormat);
   }
 
   public static void printUsage() {
     System.err.println("Usage:");
-    System.err.println("  maps-value-logger --url <url> --topic <topic> --qos <0|1|2> [--output <file>]");
+    System.err.println("  maps-value-logger --url <url> --topic <topic> --qos <0|1|2> [--format <csv|json>] [--output <file>]");
     System.err.println();
-    System.err.println("Example:");
-    System.err.println("  maps-value-logger --url tcp://localhost:1883 --topic \"/#\" --qos 1 --output maps-values.ndjson");
+    System.err.println("Examples:");
+    System.err.println("  maps-value-logger --url tcp://localhost:1883 --topic \"/#\" --qos 1 --output maps-values.csv");
+    System.err.println("  maps-value-logger --url tcp://localhost:1883 --topic \"/#\" --qos 1 --format json --output maps-values.ndjson");
   }
 
   private static String readRequiredValue(String[] args, int index, String name) {

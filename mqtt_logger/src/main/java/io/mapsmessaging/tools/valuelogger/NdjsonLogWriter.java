@@ -1,24 +1,28 @@
 package io.mapsmessaging.tools.valuelogger;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import java.io.BufferedWriter;
-import java.io.Closeable;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
-public class NdjsonLogWriter implements Closeable {
+public class NdjsonLogWriter implements LogWriter {
 
   private final String outputFileName;
+  private final Gson gson;
 
   private BufferedWriter writer;
   private boolean closeWriter;
 
   public NdjsonLogWriter(String outputFileName) {
     this.outputFileName = outputFileName;
+    this.gson = new Gson();
   }
 
+  @Override
   public void open() throws Exception {
     if (outputFileName == null || outputFileName.isBlank() || "-".equals(outputFileName)) {
       writer = new BufferedWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8));
@@ -37,8 +41,9 @@ public class NdjsonLogWriter implements Closeable {
     closeWriter = true;
   }
 
-  public synchronized void write(String logRecord) throws Exception {
-    writer.write(logRecord);
+  @Override
+  public synchronized void write(JsonObject logRecord) throws Exception {
+    writer.write(gson.toJson(logRecord));
     writer.newLine();
     writer.flush();
   }
