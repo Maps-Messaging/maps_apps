@@ -8,8 +8,10 @@
 The MAPS Value Logger runs on a fleet of heterogeneous hosts:
 
 - Raspberry Pi boxes (ARM Linux) — MAPS runs as `maps.service`
-- Linux GCS laptop — MAPS runs as `maps.service`
+- Linux GCS laptop (x86) — MAPS runs as `maps.service`
 - Central aggregator node — MAPS runs as a Docker image on Windows (and Linux) Docker Desktop
+
+Because the logger is a JVM application and all deployment artifacts are shell scripts, the same tarball and Docker image work across any Linux architecture (x86, ARM) without modification. No cross-compilation or architecture-specific packaging is required.
 
 The logger must start automatically when MAPS is available, require no human intervention after initial install, and write hourly-rotating CSV (default) or NDJSON output to `/var/log/maps-logger/`. Disk space should be monitored with warnings written to the system log; no data is ever deleted automatically.
 
