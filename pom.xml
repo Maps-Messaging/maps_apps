@@ -34,6 +34,7 @@
 
     <modules>
         <module>mqtt_logger</module>
+        <module>audit_viewer</module>
     </modules>
 
     <developers>
