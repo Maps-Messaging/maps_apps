@@ -64,6 +64,11 @@ systemctl enable maps-logger
 systemctl enable maps-logger-compress.timer
 systemctl start  maps-logger-compress.timer
 
+if systemctl is-active --quiet maps-logger; then
+  echo "Restarting maps-logger to pick up new JAR..."
+  systemctl restart maps-logger
+fi
+
 echo ""
 echo "Installation complete."
 echo ""

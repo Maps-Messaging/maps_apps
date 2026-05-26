@@ -21,6 +21,8 @@ rm -rf "$BUNDLE_DIR"
 mkdir -p "$BUNDLE_DIR"
 
 cp "$JAR" "$BUNDLE_DIR/"
+# Clean up any old staged JARs before placing the new one
+rm -f "$REPO_ROOT/install/docker/mqtt_logger-"*.jar
 cp "$JAR" "$REPO_ROOT/install/docker/$(basename "$JAR")"
 cp -r "$REPO_ROOT/install/." "$BUNDLE_DIR/"
 
