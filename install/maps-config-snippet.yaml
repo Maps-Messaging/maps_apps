@@ -1,0 +1,15 @@
+# Add this transformation block to your MAPS server configuration YAML.
+#
+# It ensures that messages received on localhost TCP connections are
+# delivered as JSON — the format the MAPS Value Logger expects.
+#
+# Place this at the top level of your MAPS server config file, or merge
+# into an existing 'transformations' block.
+
+transformations:
+  data:
+    - pattern: "*://*/*/*"
+      transformation: ""
+
+    - pattern: "tcp://127.0.0.1/*/*"
+      transformation: "Message-JSON"
