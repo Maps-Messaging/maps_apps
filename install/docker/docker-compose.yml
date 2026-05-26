@@ -1,0 +1,28 @@
+services:
+  maps:
+    image: mapsmessaging/maps-server:latest
+    volumes:
+      - ./maps-config:/opt/maps/conf
+      - logger-data:/var/log/maps-logger
+    ports:
+      - "1883:1883"
+
+  maps-logger:
+    build:
+      context: .
+    network_mode: "service:maps"
+    environment:
+      MAPS_URL: tcp://127.0.0.1:1883
+      MAPS_TOPIC: /#
+      MAPS_QOS: 1
+      MAPS_FORMAT: csv
+      MAPS_OUTPUT_DIR: /var/log/maps-logger
+      MAPS_DISK_WARN_MB: 500
+    volumes:
+      - logger-data:/var/log/maps-logger
+    depends_on:
+      - maps
+    restart: on-failure
+
+volumes:
+  logger-data:
