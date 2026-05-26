@@ -1,0 +1,7 @@
+[Unit]
+Description=Compress old MAPS Logger output files
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'find /var/log/maps-logger -name "*.csv" -mmin +120 ! -name "*.gz" -exec gzip -f {} \;'
+ExecStart=/bin/bash -c 'find /var/log/maps-logger -name "*.ndjson" -mmin +120 ! -name "*.gz" -exec gzip -f {} \;'

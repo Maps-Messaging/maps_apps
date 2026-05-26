@@ -1,0 +1,17 @@
+[Unit]
+Description=MAPS Value Logger
+After=network.target maps.service
+Wants=maps.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/maps-logger/env
+ExecStart=java -jar /usr/lib/maps-logger/maps-value-logger.jar
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=maps-logger
+
+[Install]
+WantedBy=multi-user.target
