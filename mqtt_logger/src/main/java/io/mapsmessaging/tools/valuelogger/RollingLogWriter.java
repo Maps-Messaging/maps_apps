@@ -69,7 +69,7 @@ public class RollingLogWriter implements LogWriter {
   }
 
   @Override
-  public void close() throws IOException {
+  public synchronized void close() throws IOException {
     if (currentWriter != null) {
       currentWriter.close();
     }
