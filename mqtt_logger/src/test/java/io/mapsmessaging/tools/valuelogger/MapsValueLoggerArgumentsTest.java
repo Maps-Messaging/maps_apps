@@ -85,16 +85,19 @@ class MapsValueLoggerArgumentsTest {
   }
 
   @Test
-  void diskWarnMbFromCliAndEnv() {
-    MapsValueLoggerArguments fromCli = MapsValueLoggerArguments.parse(
+  void diskWarnMbFromCli() {
+    MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883", "--disk-warn-mb", "200"},
         key -> null);
-    assertEquals(200, fromCli.getDiskWarnMb());
+    assertEquals(200, args.getDiskWarnMb());
+  }
 
-    MapsValueLoggerArguments fromEnv = MapsValueLoggerArguments.parse(
+  @Test
+  void diskWarnMbFromEnv() {
+    MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883"},
         Map.of("MAPS_DISK_WARN_MB", "1024")::get);
-    assertEquals(1024, fromEnv.getDiskWarnMb());
+    assertEquals(1024, args.getDiskWarnMb());
   }
 
   @Test
@@ -110,6 +113,26 @@ class MapsValueLoggerArgumentsTest {
     assertThrows(IllegalArgumentException.class, () ->
         MapsValueLoggerArguments.parse(
             new String[]{"--url", "tcp://localhost:1883", "--unknown"},
+            key -> null));
+  }
+
+  @Test
+  void cliUrlOverridesEnvVar() {
+    MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
+        new String[]{"--url", "tcp://cli-host:1883"},
+        Map.of("MAPS_URL", "tcp://env-host:1883")::get);
+    assertEquals("tcp://cli-host:1883", args.getUrl());
+  }
+
+  @Test
+  void diskWarnMbRejectsNonPositive() {
+    assertThrows(IllegalArgumentException.class, () ->
+        MapsValueLoggerArguments.parse(
+            new String[]{"--url", "tcp://localhost:1883", "--disk-warn-mb", "0"},
+            key -> null));
+    assertThrows(IllegalArgumentException.class, () ->
+        MapsValueLoggerArguments.parse(
+            new String[]{"--url", "tcp://localhost:1883", "--disk-warn-mb", "-1"},
             key -> null));
   }
 }

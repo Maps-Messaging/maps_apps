@@ -81,6 +81,10 @@ public class MapsValueLoggerArguments {
       }
     }
 
+    if (outputDir != null && outputFileName != null) {
+      throw new IllegalArgumentException("--output and --output-dir are mutually exclusive");
+    }
+
     // Env-var fallback, then built-in defaults
     if (url == null) {
       url = env.apply("MAPS_URL");
