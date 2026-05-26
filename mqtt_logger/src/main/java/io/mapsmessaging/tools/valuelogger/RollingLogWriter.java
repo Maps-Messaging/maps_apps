@@ -42,15 +42,19 @@ public class RollingLogWriter implements LogWriter {
   }
 
   @Override
-  public void open() throws Exception {
+  public synchronized void open() throws Exception {
     Files.createDirectories(outputDir);
     currentHourTag = HOUR_FORMATTER.format(clock.instant());
     currentWriter = createWriter(currentHourTag);
     currentWriter.open();
+    checkDiskSpace();
   }
 
   @Override
   public synchronized void write(JsonObject logRecord) throws Exception {
+    if (currentWriter == null) {
+      throw new IllegalStateException("RollingLogWriter.open() must be called before write()");
+    }
     String hourTag = HOUR_FORMATTER.format(clock.instant());
 
     if (!hourTag.equals(currentHourTag)) {

@@ -154,6 +154,14 @@ class RollingLogWriterTest {
         "CSV must start with header row");
   }
 
+  @Test
+  void writeBeforeOpenThrowsIllegalStateException() {
+    RollingLogWriter writer = new RollingLogWriter(
+        tempDir, OutputFormat.CSV, 500, Clock.systemUTC(), () -> Long.MAX_VALUE);
+    assertThrows(IllegalStateException.class,
+        () -> writer.write(new JsonObject()));
+  }
+
   private JsonObject buildRecord() {
     JsonObject record = new JsonObject();
     record.addProperty("receivedTimestamp", "2026-05-26T10:30:00Z");
