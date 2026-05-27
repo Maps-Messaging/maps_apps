@@ -1,7 +1,8 @@
 [Unit]
 Description=MAPS Value Logger
-After=network.target maps.service
-Wants=maps.service
+Documentation=https://docs.mapsmessaging.io
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -12,6 +13,10 @@ RestartSec=10s
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=maps-logger
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target

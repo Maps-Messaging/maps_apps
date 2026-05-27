@@ -2,23 +2,26 @@
 
 This guide installs and configures the Maps Logger service.
 
-The logger subscribes to the configured MAPS/MQTT topic and writes received records to:
+The logger subscribes to the configured MAPS/MQTT topic and writes received records to hourly
+rotating files under:
 
 ```text
-/opt/logger/maps-logger/maps-values.csv
+/var/log/maps-logger/maps-YYYY-MM-DD-HH.csv
 ```
+
+Files are never deleted. Files older than two hours are automatically gzip-compressed by a
+systemd timer. Disk space is monitored and a warning is written to the system log when free
+space drops below the configured threshold.
+
+---
 
 ## Important: enable JSON transformation
 
-For valid logging, the MAPS server must transform MQTT messages into JSON before the logger receives them.
+For valid logging, the MAPS server must transform MQTT messages into JSON before the logger
+receives them.
 
-Edit:
-
-```text
-/opt/maps/conf/TransformationManager.yaml
-```
-
-Add the following configuration:
+Add the following block to your MAPS server configuration YAML (a ready-to-paste copy is
+provided in `install/maps-config-snippet.yaml`):
 
 ```yaml
 transformations:
@@ -26,168 +29,192 @@ transformations:
     - pattern: "*://*/*/*"
       transformation: ""
 
-    - pattern: "tcp://127.0.0.1/mqtt/*"
-      transformation: "Schema-To-Json"
+    - pattern: "tcp://127.0.0.1/*/*"
+      transformation: "Message-JSON"
 ```
 
-If this is not configured, the logger will not receive the structured JSON fields required for valid logging, including timestamps and related metadata.
+The second rule applies only to connections from localhost, ensuring the logger receives
+fully structured JSON envelopes containing timestamps, QoS, session ID, and all other
+metadata fields.
+
+---
 
 ## Package contents
 
-The installation package should contain these files:
+Build and assemble the install tarball:
+
+```bash
+./scripts/bundle.sh
+```
+
+This produces `maps-logger-install.tar.gz` containing:
 
 ```text
-install.sh
-maps-logger.service
-maps-logger.env
-mqtt-logger-1.0.0-SNAPSHOT.jar
+maps-logger-bundle/
+  install.sh
+  maps-config-snippet.yaml
+  mqtt_logger-1.0.0-SNAPSHOT.jar
+  systemd/
+    maps-logger.service
+    maps-logger-compress.service
+    maps-logger-compress.timer
+    maps-logger.env
+  docker/
+    Dockerfile
+    docker-compose.yml
 ```
 
-## Installation
+---
 
-Extract the package:
+## Native installation (Raspberry Pi / Linux GCS laptop)
 
-```bash
-tar -xvf maps-logger.tar
-```
-
-Change into the scripts directory:
+Extract the tarball and run the installer as root:
 
 ```bash
-cd ./scripts
-```
-
-Run the installer:
-
-```bash
-./install.sh
+tar -xzf maps-logger-install.tar.gz
+sudo ./maps-logger-bundle/install.sh
 ```
 
 The installer will:
 
-- create the required `/opt/logger` directory structure
+- verify Java 21 or later is installed
+- create `/usr/lib/maps-logger/`, `/etc/maps-logger/`, `/var/log/maps-logger/`
 - install the logger JAR
-- create the `/opt/logger/bin/maps-logger` launcher script
-- install the systemd service
-- install the logger environment file
-- enable and start the `maps-logger` service
+- install the systemd unit files
+- install the environment file (only on first install — not overwritten on upgrade)
+- enable `maps-logger.service` and `maps-logger-compress.timer`
+- restart `maps-logger` if it is already running (upgrade path)
 
-## Installed layout
-
-After installation, the logger is installed under:
+### Installed layout
 
 ```text
-/opt/logger/bin/maps-logger
-/opt/logger/conf/maps-logger.env
-/opt/logger/lib/maps-logger.jar
-/opt/logger/maps-logger/maps-values.csv
-/opt/logger/systemd/maps-logger.service
-```
-
-The active systemd service file is copied to:
-
-```text
+/usr/lib/maps-logger/maps-value-logger.jar
+/etc/maps-logger/env
+/var/log/maps-logger/
 /etc/systemd/system/maps-logger.service
+/etc/systemd/system/maps-logger-compress.service
+/etc/systemd/system/maps-logger-compress.timer
 ```
+
+### Deploy to multiple hosts
+
+```bash
+./scripts/deploy.sh pi@192.168.1.10 pi@192.168.1.11 ubuntu@gcs-laptop
+```
+
+---
+
+## Docker installation (aggregator node)
+
+The logger can run as a sidecar alongside the MAPS server container. The logger container
+shares the MAPS container's network namespace so that `tcp://127.0.0.1:1883` resolves
+correctly and the `tcp://127.0.0.1/*/*` transformation rule matches.
+
+Stage the JAR and start:
+
+```bash
+./scripts/bundle.sh
+cd install/docker
+docker compose up -d
+```
+
+Log files are written to the `logger-data` Docker volume and persist across restarts.
+
+---
 
 ## Configuration
 
-The logger configuration is stored in:
+The logger is configured entirely via environment variables. On native hosts these are set
+in `/etc/maps-logger/env`. In Docker they are set in `docker-compose.yml`.
 
-```text
-/opt/logger/conf/maps-logger.env
-```
+| Variable | Default | Description |
+|---|---|---|
+| `MAPS_LOGGER_URL` | *(required)* | MQTT broker URL — must be `tcp://127.0.0.1:1883` |
+| `MAPS_LOGGER_TOPIC` | `/#` | Topic filter to subscribe to |
+| `MAPS_LOGGER_QOS` | `1` | MQTT QoS level: 0, 1, or 2 |
+| `MAPS_LOGGER_FORMAT` | `csv` | Output format: `csv` or `json` (json files use `.ndjson` extension) |
+| `MAPS_LOGGER_OUTPUT_DIR` | `/var/log/maps-logger` | Directory for hourly output files |
+| `MAPS_LOGGER_DISK_WARN_MB` | `500` | Free-space warning threshold in MB |
 
-Example configuration:
+Edit `/etc/maps-logger/env` then restart:
 
 ```bash
-MAPS_LOGGER_URL=tcp://localhost:1883
-MAPS_LOGGER_TOPIC=/#
-MAPS_LOGGER_QOS=1
-MAPS_LOGGER_FORMAT=csv
-MAPS_LOGGER_OUTPUT=/opt/logger/maps-logger/maps-values.csv
+sudo systemctl restart maps-logger
 ```
+
+To override individual values without editing the base file:
+
+```bash
+sudo systemctl edit maps-logger
+```
+
+---
 
 ## Service management
 
-Check the service status:
-
 ```bash
+# Check status
 systemctl status maps-logger --no-pager
-```
 
-View recent logs:
-
-```bash
-journalctl -u maps-logger -n 100 --no-pager
-```
-
-Follow the logs:
-
-```bash
+# Follow live logs
 journalctl -u maps-logger -f
-```
 
-Restart the service:
+# View recent logs
+journalctl -u maps-logger -n 100 --no-pager
 
-```bash
+# Restart
 sudo systemctl restart maps-logger
-```
 
-Stop the service:
-
-```bash
+# Stop
 sudo systemctl stop maps-logger
 ```
 
-## Output
+---
 
-The default CSV output file is:
+## Output files
 
-```text
-/opt/logger/maps-logger/maps-values.csv
-```
-
-To change the output file, edit:
+Hourly files are created automatically:
 
 ```text
-/opt/logger/conf/maps-logger.env
+/var/log/maps-logger/maps-2026-05-27-14.csv
+/var/log/maps-logger/maps-2026-05-27-15.csv
+/var/log/maps-logger/maps-2026-05-27-14.csv.gz   ← compressed after 2 hours
 ```
 
-Then restart the service:
+Files are **never deleted**. The compression timer runs hourly and gzips files older than
+two hours. Disk space warnings appear in the system journal:
 
-```bash
-sudo systemctl restart maps-logger
 ```
+journalctl -u maps-logger | grep WARNING
+```
+
+---
 
 ## Troubleshooting
 
 ### No timestamps or missing metadata
 
-Check that `/opt/maps/conf/TransformationManager.yaml` contains the required `Schema-To-Json` transformation.
-
-Without this transformation, the logger will not receive valid structured JSON records.
+Verify the MAPS server YAML contains the `Message-JSON` transformation for
+`tcp://127.0.0.1/*/*`. Without it the logger receives raw payloads rather than structured
+JSON, and most fields will be empty.
 
 ### Service does not start
 
-Check the service status:
-
 ```bash
 systemctl status maps-logger --no-pager
+journalctl -u maps-logger -n 50 --no-pager
 ```
 
-Then check the logs:
+### Java not found or wrong version
+
+The installer requires Java 21 or later. Check the installed version:
 
 ```bash
-journalctl -u maps-logger -n 100 --no-pager
+java -version
 ```
 
-### Java cannot run the logger
-
-The installed launcher runs the main class directly using:
+The logger is launched with:
 
 ```bash
-java -cp /opt/logger/lib/maps-logger.jar io.mapsmessaging.tools.valuelogger.MapsValueLoggerMain
+java -jar /usr/lib/maps-logger/maps-value-logger.jar
 ```
-
-This avoids requiring a `Main-Class` manifest entry in the JAR.

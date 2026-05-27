@@ -87,21 +87,21 @@ public class MapsValueLoggerArguments {
 
     // Env-var fallback, then built-in defaults
     if (url == null) {
-      url = env.apply("MAPS_URL");
+      url = env.apply("MAPS_LOGGER_URL");
     }
 
     if (topic == null) {
-      String envTopic = env.apply("MAPS_TOPIC");
+      String envTopic = env.apply("MAPS_LOGGER_TOPIC");
       topic = (envTopic != null) ? envTopic : "/#";
     }
 
     if (qos == null) {
-      String envQos = env.apply("MAPS_QOS");
+      String envQos = env.apply("MAPS_LOGGER_QOS");
       qos = (envQos != null) ? parseQos(envQos) : 1;
     }
 
     if (requestedOutputFormat == null) {
-      String envFormat = env.apply("MAPS_FORMAT");
+      String envFormat = env.apply("MAPS_LOGGER_FORMAT");
       if (envFormat != null) {
         requestedOutputFormat = OutputFormat.parse(envFormat);
       }
@@ -109,17 +109,17 @@ public class MapsValueLoggerArguments {
 
     // --output-dir takes precedence; only default to rolling mode if --output was not provided
     if (outputDir == null && outputFileName == null) {
-      String envOutputDir = env.apply("MAPS_OUTPUT_DIR");
+      String envOutputDir = env.apply("MAPS_LOGGER_OUTPUT_DIR");
       outputDir = (envOutputDir != null) ? envOutputDir : "/var/log/maps-logger";
     }
 
     if (diskWarnMb == null) {
-      String envWarn = env.apply("MAPS_DISK_WARN_MB");
+      String envWarn = env.apply("MAPS_LOGGER_DISK_WARN_MB");
       diskWarnMb = (envWarn != null) ? parseDiskWarnMb(envWarn) : 500;
     }
 
     if (url == null || url.isBlank()) {
-      throw new IllegalArgumentException("Missing required argument: --url (or set MAPS_URL)");
+      throw new IllegalArgumentException("Missing required argument: --url (or set MAPS_LOGGER_URL)");
     }
 
     OutputFormat resolvedFormat = (outputDir != null)
@@ -140,9 +140,9 @@ public class MapsValueLoggerArguments {
         "    [--disk-warn-mb <mb>]");
     System.err.println();
     System.err.println(
-        "Environment variables: MAPS_URL, MAPS_TOPIC, MAPS_QOS, MAPS_FORMAT,");
+        "Environment variables: MAPS_LOGGER_URL, MAPS_LOGGER_TOPIC, MAPS_LOGGER_QOS, MAPS_LOGGER_FORMAT,");
     System.err.println(
-        "  MAPS_OUTPUT_DIR, MAPS_DISK_WARN_MB");
+        "  MAPS_LOGGER_OUTPUT_DIR, MAPS_LOGGER_DISK_WARN_MB");
   }
 
   private static String readRequiredValue(String[] args, int index, String name) {

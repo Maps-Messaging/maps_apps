@@ -12,12 +12,12 @@ services:
       context: .
     network_mode: "service:maps"
     environment:
-      MAPS_URL: tcp://127.0.0.1:1883
-      MAPS_TOPIC: /#
-      MAPS_QOS: 1
-      MAPS_FORMAT: csv
-      MAPS_OUTPUT_DIR: /var/log/maps-logger
-      MAPS_DISK_WARN_MB: 500
+      MAPS_LOGGER_URL: tcp://127.0.0.1:1883
+      MAPS_LOGGER_TOPIC: /#
+      MAPS_LOGGER_QOS: 1
+      MAPS_LOGGER_FORMAT: csv
+      MAPS_LOGGER_OUTPUT_DIR: /var/log/maps-logger
+      MAPS_LOGGER_DISK_WARN_MB: 500
     volumes:
       - logger-data:/var/log/maps-logger
     depends_on:

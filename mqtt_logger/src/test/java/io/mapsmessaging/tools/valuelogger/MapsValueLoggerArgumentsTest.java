@@ -25,7 +25,7 @@ class MapsValueLoggerArgumentsTest {
   void urlFromEnvVar() {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{},
-        Map.of("MAPS_URL", "tcp://127.0.0.1:1883")::get);
+        Map.of("MAPS_LOGGER_URL", "tcp://127.0.0.1:1883")::get);
     assertEquals("tcp://127.0.0.1:1883", args.getUrl());
   }
 
@@ -33,7 +33,7 @@ class MapsValueLoggerArgumentsTest {
   void throwsWhenUrlMissingFromBothCliAndEnv() {
     IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
         MapsValueLoggerArguments.parse(new String[]{}, key -> null));
-    assertTrue(ex.getMessage().contains("--url"));
+    assertTrue(ex.getMessage().contains("MAPS_LOGGER_URL"));
   }
 
   @Test
@@ -62,7 +62,7 @@ class MapsValueLoggerArgumentsTest {
   void outputDirFromEnvActivatesRollingMode() {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883"},
-        Map.of("MAPS_OUTPUT_DIR", "/data/logs")::get);
+        Map.of("MAPS_LOGGER_OUTPUT_DIR", "/data/logs")::get);
     assertEquals("/data/logs", args.getOutputDir());
   }
 
@@ -80,7 +80,7 @@ class MapsValueLoggerArgumentsTest {
   void cliArgOverridesEnvVar() {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883", "--topic", "/cli-topic"},
-        Map.of("MAPS_TOPIC", "/env-topic")::get);
+        Map.of("MAPS_LOGGER_TOPIC", "/env-topic")::get);
     assertEquals("/cli-topic", args.getTopic());
   }
 
@@ -96,7 +96,7 @@ class MapsValueLoggerArgumentsTest {
   void diskWarnMbFromEnv() {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883"},
-        Map.of("MAPS_DISK_WARN_MB", "1024")::get);
+        Map.of("MAPS_LOGGER_DISK_WARN_MB", "1024")::get);
     assertEquals(1024, args.getDiskWarnMb());
   }
 
@@ -104,7 +104,7 @@ class MapsValueLoggerArgumentsTest {
   void formatFromEnvVar() {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883"},
-        Map.of("MAPS_FORMAT", "json")::get);
+        Map.of("MAPS_LOGGER_FORMAT", "json")::get);
     assertEquals(OutputFormat.JSON, args.getOutputFormat());
   }
 
@@ -120,7 +120,7 @@ class MapsValueLoggerArgumentsTest {
   void cliUrlOverridesEnvVar() {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://cli-host:1883"},
-        Map.of("MAPS_URL", "tcp://env-host:1883")::get);
+        Map.of("MAPS_LOGGER_URL", "tcp://env-host:1883")::get);
     assertEquals("tcp://cli-host:1883", args.getUrl());
   }
 
