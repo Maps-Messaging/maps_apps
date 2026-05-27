@@ -1,0 +1,36 @@
+[Unit]
+Description=Maps Logger
+Documentation=https://docs.mapsmessaging.io
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=root
+Group=root
+
+EnvironmentFile=-/opt/logger/conf/maps-logger.env
+
+ExecStart=/opt/logger/bin/maps-logger \
+  --url ${MAPS_LOGGER_URL} \
+  --topic ${MAPS_LOGGER_TOPIC} \
+  --qos ${MAPS_LOGGER_QOS} \
+  --format ${MAPS_LOGGER_FORMAT} \
+  --output ${MAPS_LOGGER_OUTPUT}
+
+Restart=always
+RestartSec=5
+
+WorkingDirectory=/opt/logger
+
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
