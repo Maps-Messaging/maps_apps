@@ -18,7 +18,7 @@ public class JsonLogRecordBuilder {
     logRecord.addProperty("topic", topic);
 
     addServerTime(source, logRecord, receivedTimestamp);
-
+    addRootValue(source, logRecord, "correlationData");
     addRootValue(source, logRecord, "contentType");
     addRootValue(source, logRecord, "identifier");
     addRootValue(source, logRecord, "qualityOfService", "qos");

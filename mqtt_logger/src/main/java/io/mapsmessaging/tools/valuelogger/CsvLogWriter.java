@@ -18,6 +18,7 @@ public class CsvLogWriter implements LogWriter {
       "latencyMs",
       "topic",
       "contentType",
+      "correlationData",
       "identifier",
       "qos",
       "protocol",
