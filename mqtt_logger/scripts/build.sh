@@ -1,4 +1,7 @@
 #!/bin/bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
-mvn clean package -pl mqtt_logger
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+mvn clean package
