@@ -35,6 +35,7 @@
     <modules>
         <module>mqtt_logger</module>
         <module>audit_viewer</module>
+        <module>udp_helpers</module>
     </modules>
 
     <developers>
