@@ -36,7 +36,8 @@ public class AuditJournalConsolePrinter {
 
   private void printHeader() {
     System.out.printf(
-        "%-8s %-8s %-8s %-28s %-24s %-18s %-18s %-20s %-12s %-40s %-30s%n",
+        "%-32s %-8s %-8s %-8s %-28s %-24s %-18s %-18s %-20s %-12s %-40s %-30s%n",
+        "Journal",
         "Line",
         "Seq",
         "Status",
@@ -51,13 +52,14 @@ public class AuditJournalConsolePrinter {
     );
 
     System.out.println(
-        "------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
+        "----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
     );
   }
 
   private void printRecord(AuditRecordView record) {
     System.out.printf(
-        "%-8d %-8d %-8s %-28s %-24s %-18s %-18s %-20s %-12s %-40s %-30s%n",
+        "%-32s %-8d %-8d %-8s %-28s %-24s %-18s %-18s %-20s %-12s %-40s %-30s%n",
+        truncate(record.getJournalFileName(), 32),
         record.getLineNumber(),
         record.getSequenceNumber(),
         record.getStatus(),

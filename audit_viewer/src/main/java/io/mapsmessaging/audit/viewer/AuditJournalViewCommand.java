@@ -21,6 +21,7 @@
 package io.mapsmessaging.audit.viewer;
 
 import io.mapsmessaging.audit.AuditKeyUtils;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.interfaces.EdECPublicKey;
 import java.util.List;
@@ -33,7 +34,7 @@ public class AuditJournalViewCommand {
       return;
     }
 
-    Path journalPath = Path.of(args[0]);
+    Path auditPath = Path.of(args[0]);
     EdECPublicKey publicKey = null;
 
     if (args.length == 3) {
@@ -47,7 +48,13 @@ public class AuditJournalViewCommand {
     }
 
     AuditJournalViewer auditJournalViewer = new AuditJournalViewer(publicKey);
-    List<AuditRecordView> records = auditJournalViewer.readAndVerify(journalPath);
+    List<AuditRecordView> records;
+
+    if (Files.isDirectory(auditPath)) {
+      records = auditJournalViewer.readAndVerifyJournalRoot(auditPath);
+    } else {
+      records = auditJournalViewer.readAndVerify(auditPath);
+    }
 
     AuditJournalConsolePrinter auditJournalConsolePrinter = new AuditJournalConsolePrinter();
     auditJournalConsolePrinter.print(records);
@@ -55,6 +62,8 @@ public class AuditJournalViewCommand {
 
   private static void printUsage() {
     System.out.println("Usage:");
+    System.out.println("  maps-audit-view <journal-root-directory>");
+    System.out.println("  maps-audit-view <journal-root-directory> --public-key <audit-public-key.pem>");
     System.out.println("  maps-audit-view <journal.jsonl>");
     System.out.println("  maps-audit-view <journal.jsonl> --public-key <audit-public-key.pem>");
   }

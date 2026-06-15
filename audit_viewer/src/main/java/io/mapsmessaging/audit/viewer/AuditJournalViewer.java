@@ -30,13 +30,21 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.interfaces.EdECPublicKey;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 public class AuditJournalViewer {
 
   private static final String GENESIS_HASH =
       "0000000000000000000000000000000000000000000000000000000000000000";
+
+  private static final Pattern JOURNAL_FILE_PATTERN =
+      Pattern.compile("audit-(\\d{4}-\\d{2}-\\d{2})-(\\d{6})\\.jsonl");
 
   private final Gson gson;
   private final AuditCrypto auditCrypto;
@@ -51,12 +59,42 @@ public class AuditJournalViewer {
   }
 
   public List<AuditRecordView> readAndVerify(Path journalPath) throws IOException {
+    return readAndVerify(List.of(journalPath));
+  }
+
+  public List<AuditRecordView> readAndVerifyJournalRoot(Path journalRoot) throws IOException {
+    return readAndVerify(discoverJournalFiles(journalRoot));
+  }
+
+  public List<AuditRecordView> readAndVerify(List<Path> journalPaths) throws IOException {
     List<AuditRecordView> records = new ArrayList<>();
 
-    long expectedSequenceNumber = 1;
+    VerificationState verificationState = new VerificationState(
+        1,
+        GENESIS_HASH,
+        false
+    );
+
+    for (Path journalPath : journalPaths) {
+      verificationState = readAndVerifyJournal(
+          journalPath,
+          records,
+          verificationState
+      );
+    }
+
+    return records;
+  }
+
+  private VerificationState readAndVerifyJournal(
+      Path journalPath,
+      List<AuditRecordView> records,
+      VerificationState verificationState
+  ) throws IOException {
     long lineNumber = 0;
-    String previousRecordHash = GENESIS_HASH;
-    boolean chainAlreadyBroken = false;
+    long expectedSequenceNumber = verificationState.expectedSequenceNumber();
+    String previousRecordHash = verificationState.previousRecordHash();
+    boolean chainAlreadyBroken = verificationState.chainAlreadyBroken();
 
     try (BufferedReader bufferedReader = Files.newBufferedReader(journalPath, StandardCharsets.UTF_8)) {
       String line = bufferedReader.readLine();
@@ -66,6 +104,7 @@ public class AuditJournalViewer {
 
         if (!line.isBlank()) {
           AuditRecordView recordView = verifyLine(
+              journalPath,
               line,
               lineNumber,
               expectedSequenceNumber,
@@ -95,10 +134,15 @@ public class AuditJournalViewer {
       }
     }
 
-    return records;
+    return new VerificationState(
+        expectedSequenceNumber,
+        previousRecordHash,
+        chainAlreadyBroken
+    );
   }
 
   private AuditRecordView verifyLine(
+      Path journalPath,
       String line,
       long lineNumber,
       long expectedSequenceNumber,
@@ -108,7 +152,11 @@ public class AuditJournalViewer {
     try {
       JsonObject journalObject = gson.fromJson(line, JsonObject.class);
 
-      AuditRecordView recordView = createRecordView(lineNumber, journalObject);
+      AuditRecordView recordView = createRecordView(
+          journalPath,
+          lineNumber,
+          journalObject
+      );
 
       if (chainAlreadyBroken) {
         recordView.setStatus(AuditRecordVerificationStatus.INVALID);
@@ -184,6 +232,8 @@ public class AuditJournalViewer {
       return recordView;
     } catch (Exception exception) {
       return AuditRecordView.builder()
+          .journalPath(journalPath.toString())
+          .journalFileName(journalPath.getFileName().toString())
           .lineNumber(lineNumber)
           .sequenceNumber(-1)
           .status(AuditRecordVerificationStatus.INVALID)
@@ -192,8 +242,14 @@ public class AuditJournalViewer {
     }
   }
 
-  private AuditRecordView createRecordView(long lineNumber, JsonObject journalObject) {
+  private AuditRecordView createRecordView(
+      Path journalPath,
+      long lineNumber,
+      JsonObject journalObject
+  ) {
     return AuditRecordView.builder()
+        .journalPath(journalPath.toString())
+        .journalFileName(journalPath.getFileName().toString())
         .lineNumber(lineNumber)
         .sequenceNumber(getLong(journalObject, "sequenceNumber"))
         .timestamp(getString(journalObject, "timestamp"))
@@ -213,6 +269,38 @@ public class AuditJournalViewer {
         .status(AuditRecordVerificationStatus.INVALID)
         .validationMessage("Not verified")
         .build();
+  }
+
+  private List<Path> discoverJournalFiles(Path journalRoot) throws IOException {
+    if (!Files.exists(journalRoot)) {
+      return List.of();
+    }
+
+    try (Stream<Path> pathStream = Files.walk(journalRoot)) {
+      return pathStream
+          .filter(Files::isRegularFile)
+          .map(this::toJournalFile)
+          .filter(journalFile -> journalFile != null)
+          .sorted(Comparator
+              .comparing(JournalFile::localDate)
+              .thenComparingInt(JournalFile::index))
+          .map(JournalFile::path)
+          .toList();
+    }
+  }
+
+  private JournalFile toJournalFile(Path path) {
+    String fileName = path.getFileName().toString();
+    Matcher matcher = JOURNAL_FILE_PATTERN.matcher(fileName);
+
+    if (!matcher.matches()) {
+      return null;
+    }
+
+    LocalDate localDate = LocalDate.parse(matcher.group(1));
+    int index = Integer.parseInt(matcher.group(2));
+
+    return new JournalFile(path, localDate, index);
   }
 
   private AuditRecordView invalid(AuditRecordView recordView, String validationMessage) {
@@ -235,5 +323,19 @@ public class AuditJournalViewer {
     }
 
     return jsonObject.get(name).getAsLong();
+  }
+
+  private record VerificationState(
+      long expectedSequenceNumber,
+      String previousRecordHash,
+      boolean chainAlreadyBroken
+  ) {
+  }
+
+  private record JournalFile(
+      Path path,
+      LocalDate localDate,
+      int index
+  ) {
   }
 }

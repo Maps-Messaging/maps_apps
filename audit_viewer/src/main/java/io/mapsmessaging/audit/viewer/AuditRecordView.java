@@ -33,6 +33,8 @@ import lombok.Setter;
 @AllArgsConstructor
 public class AuditRecordView {
 
+  private String journalPath;
+  private String journalFileName;
   private long lineNumber;
   private long sequenceNumber;
   private String timestamp;
