@@ -14,30 +14,37 @@ steps:
     command:
       - 'echo "--- Downloading Maven artifacts"'
       - 'buildkite-agent artifact download "*/target/*.jar" . --step build'
-
       - 'echo "--- Building Debian package"'
       - "chmod +x ./packaging/scripts/*.sh"
       - "./packaging/scripts/build-debian.sh"
-
       - 'echo "--- Reading Debian package information"'
       - "dpkg-deb --info packaging/output/*.deb"
-
       - 'echo "--- Listing Debian package contents"'
       - "dpkg-deb --contents packaging/output/*.deb"
+      - |
+        echo "--- Retrieving Nexus credentials"
 
-      - 'echo "--- Retrieving Nexus credentials"'
-      - 'NEXUS_USER="$(buildkite-agent secret get NEXUS_USER)"'
-      - 'NEXUS_PASSWORD="$(buildkite-agent secret get NEXUS_PASSWORD)"'
+        NEXUS_USER="$(buildkite-agent secret get NEXUS_USER)"
+        NEXUS_PASSWORD="$(buildkite-agent secret get NEXUS_PASSWORD)"
 
-      - 'echo "--- Uploading Debian package to maps_apt_daily"'
-      - >
-        timeout 5m
-        ./packaging/scripts/upload_deb_package.sh
-        "${NEXUS_USER}"
-        "${NEXUS_PASSWORD}"
-        maps_apt_daily
+        if [ -z "$${NEXUS_USER}" ]; then
+          echo "NEXUS_USER secret is empty" >&2
+          exit 1
+        fi
 
-      - 'echo "--- Nexus upload completed"'
+        if [ -z "$${NEXUS_PASSWORD}" ]; then
+          echo "NEXUS_PASSWORD secret is empty" >&2
+          exit 1
+        fi
+
+        echo "--- Uploading Debian package to maps_apt_daily"
+
+        timeout 10m ./packaging/scripts/upload_deb_package.sh \
+          "$${NEXUS_USER}" \
+          "$${NEXUS_PASSWORD}" \
+          maps_apt_daily
+
+        echo "--- Nexus upload completed"
     artifact_paths:
       - "packaging/output/*.deb"
     agents:
