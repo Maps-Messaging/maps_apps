@@ -37,6 +37,7 @@
         <module>audit_viewer</module>
         <module>udp_helpers</module>
         <module>canbus_replay</module>
+        <module>top</module>
     </modules>
 
     <developers>
