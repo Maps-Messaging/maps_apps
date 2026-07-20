@@ -100,16 +100,26 @@ find_module_jar() {
   printf '%s\n' "${jars[0]}"
 }
 
+install_module_jar() {
+  local module="$1"
+  local jar_file="$2"
+  local installed_name="${module}.jar"
+
+  install \
+    -m 0644 \
+    "${jar_file}" \
+    "${PACKAGE_INSTALL_DIR}/${installed_name}"
+
+  echo "Included module ${module}: $(basename "${jar_file}")"
+}
+
 install_cli_module() {
   local module="$1"
   local jar_file="$2"
   local installed_name="${module}.jar"
   local command_name="maps-${module//_/-}"
 
-  install \
-    -m 0644 \
-    "${jar_file}" \
-    "${PACKAGE_INSTALL_DIR}/${installed_name}"
+  install_module_jar "${module}" "${jar_file}"
 
   cat > "${PACKAGE_BIN_DIR}/${command_name}" <<EOF
 #!/bin/sh
@@ -118,7 +128,40 @@ EOF
 
   chmod 0755 "${PACKAGE_BIN_DIR}/${command_name}"
 
-  echo "Included CLI module ${module}: $(basename "${jar_file}")"
+  echo "Included CLI command ${command_name}"
+}
+
+install_module_launchers() {
+  local module="$1"
+  local launcher_dir="${ROOT_DIR}/${module}/install/bin"
+  local launcher
+  local command_name
+
+  if [[ ! -d "${launcher_dir}" ]]; then
+    return
+  fi
+
+  while IFS= read -r -d '' launcher; do
+    command_name="$(basename "${launcher}")"
+
+    if [[ -e "${PACKAGE_BIN_DIR}/${command_name}" ]]; then
+      echo "Duplicate launcher name: ${command_name}" >&2
+      exit 1
+    fi
+
+    install \
+      -m 0755 \
+      "${launcher}" \
+      "${PACKAGE_BIN_DIR}/${command_name}"
+
+    echo "Included launcher ${command_name} from ${module}"
+  done < <(
+    find "${launcher_dir}" \
+      -maxdepth 1 \
+      -type f \
+      -print0 |
+      sort -z
+  )
 }
 
 install_logger_module() {
@@ -191,9 +234,13 @@ EOF
 
 for module in "${MODULES[@]}"; do
   jar_file="$(find_module_jar "${module}")"
+  launcher_dir="${ROOT_DIR}/${module}/install/bin"
 
   if [[ "${module}" == "${LOGGER_MODULE}" ]]; then
     install_logger_module "${jar_file}"
+  elif [[ -d "${launcher_dir}" ]]; then
+    install_module_jar "${module}" "${jar_file}"
+    install_module_launchers "${module}"
   else
     install_cli_module "${module}" "${jar_file}"
   fi
@@ -279,14 +326,27 @@ dpkg-deb \
 
 echo
 echo "Built ${OUTPUT_FILE}"
+
 echo
 echo "Installed applications:"
-find "${PACKAGE_INSTALL_DIR}" -maxdepth 1 -type f -printf '  %f\n' | sort
+find "${PACKAGE_INSTALL_DIR}" \
+  -maxdepth 1 \
+  -type f \
+  -printf '  %f\n' |
+  sort
 
 echo
 echo "Installed commands:"
-find "${PACKAGE_BIN_DIR}" -maxdepth 1 -type f -printf '  %f\n' | sort
+find "${PACKAGE_BIN_DIR}" \
+  -maxdepth 1 \
+  -type f \
+  -printf '  %f\n' |
+  sort
 
 echo
 echo "Installed systemd units:"
-find "${PACKAGE_ROOT}${SYSTEMD_DIR}" -maxdepth 1 -type f -printf '  %f\n' | sort
+find "${PACKAGE_ROOT}${SYSTEMD_DIR}" \
+  -maxdepth 1 \
+  -type f \
+  -printf '  %f\n' |
+  sort
