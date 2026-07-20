@@ -8,19 +8,20 @@ steps:
     agents:
       queue: "java_build_queue"
 
-  - label: ":debian: Build and publish maps-apps package"
+  - label: ":debian: Build and publish maps-apps"
     key: "debian"
     depends_on: "build"
     command:
       - 'buildkite-agent artifact download "*/target/*.jar" . --step build'
-      - "chmod +x ./packaging/scripts/build_deb_package.sh"
+      - "chmod +x ./packaging/scripts/*.sh"
+      - "./packaging/scripts/build-debian.sh"
+      - "dpkg-deb --info packaging/output/*.deb"
+      - "dpkg-deb --contents packaging/output/*.deb"
       - >
-        ./packaging/scripts/build_deb_package.sh
+        ./packaging/scripts/upload_deb_package.sh
         "$(buildkite-agent secret get NEXUS_USER)"
         "$(buildkite-agent secret get NEXUS_PASSWORD)"
         maps_apt_daily
-      - "dpkg-deb --info packaging/output/*.deb"
-      - "dpkg-deb --contents packaging/output/*.deb"
     artifact_paths:
       - "packaging/output/*.deb"
     agents:
