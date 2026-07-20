@@ -12,16 +12,32 @@ steps:
     key: "debian"
     depends_on: "build"
     command:
+      - 'echo "--- Downloading Maven artifacts"'
       - 'buildkite-agent artifact download "*/target/*.jar" . --step build'
+
+      - 'echo "--- Building Debian package"'
       - "chmod +x ./packaging/scripts/*.sh"
       - "./packaging/scripts/build-debian.sh"
+
+      - 'echo "--- Reading Debian package information"'
       - "dpkg-deb --info packaging/output/*.deb"
+
+      - 'echo "--- Listing Debian package contents"'
       - "dpkg-deb --contents packaging/output/*.deb"
+
+      - 'echo "--- Retrieving Nexus credentials"'
+      - 'NEXUS_USER="$(buildkite-agent secret get NEXUS_USER)"'
+      - 'NEXUS_PASSWORD="$(buildkite-agent secret get NEXUS_PASSWORD)"'
+
+      - 'echo "--- Uploading Debian package to maps_apt_daily"'
       - >
+        timeout 5m
         ./packaging/scripts/upload_deb_package.sh
-        "$(buildkite-agent secret get NEXUS_USER)"
-        "$(buildkite-agent secret get NEXUS_PASSWORD)"
+        "${NEXUS_USER}"
+        "${NEXUS_PASSWORD}"
         maps_apt_daily
+
+      - 'echo "--- Nexus upload completed"'
     artifact_paths:
       - "packaging/output/*.deb"
     agents:
