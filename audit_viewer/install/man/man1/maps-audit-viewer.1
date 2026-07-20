@@ -1,0 +1,60 @@
+.TH MAPS-AUDIT-VIEWER 1 "20 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-audit-viewer \- inspect and verify Maps audit journals
+.SH SYNOPSIS
+.B maps-audit-viewer
+.I journal-path
+.RI [ "--public-key" " public-key.pem" ]
+.SH DESCRIPTION
+.B maps-audit-viewer
+reads a Maps append-only audit journal and prints each record with its verification status.
+The input may be a single JSON Lines journal file or a journal root directory.
+.PP
+Without a public key, the viewer verifies sequence ordering, previous-record hash linkage,
+and record hash integrity.  When an Ed25519 public key is supplied, it also verifies record
+signatures.
+.PP
+A failed record is reported as invalid.  Records after a broken link should also be treated
+as untrusted because the audit chain is no longer continuous.
+.SH OPTIONS
+.TP
+.BI --public-key " public-key.pem"
+Read an Ed25519 public key from the specified PEM file and verify audit record signatures.
+This option must follow the journal path.
+.SH ARGUMENTS
+.TP
+.I journal-path
+Path to one audit journal file or to a journal root directory.
+.SH OUTPUT
+The command prints a table containing record position, sequence number, verification status,
+timestamp, correlation data, actor, source, action, outcome, message information, and a
+validation result.  A summary reports the total, valid, and invalid record counts.
+.SH EXAMPLES
+Verify a single journal without signature checking:
+.PP
+.EX
+maps-audit-viewer /var/lib/maps/audit/journal/2026-05-25/audit-2026-05-25-000001.jsonl
+.EE
+.PP
+Verify a journal and its signatures:
+.PP
+.EX
+maps-audit-viewer /var/lib/maps/audit/journal \
+  --public-key /opt/maps/conf/audit-public-key.pem
+.EE
+.SH FILES
+.TP
+.I /var/lib/maps/audit/journal/
+Typical Maps audit journal root.
+.TP
+.I /opt/maps/conf/audit-public-key.pem
+Typical audit verification public key location.
+.TP
+.I /opt/maps/apps/audit_viewer.jar
+Executable JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.

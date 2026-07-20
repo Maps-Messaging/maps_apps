@@ -1,0 +1,68 @@
+.TH MAPS-TOP 1 "20 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-top \- display live Maps server statistics in a terminal
+.SH SYNOPSIS
+.B maps-top
+.RI [ server-url
+.RI [ username
+.RI [ password ]]]
+.SH DESCRIPTION
+.B maps-top
+opens a full-screen terminal dashboard and polls the Maps REST API for server information,
+server status, destination statistics, and interface statistics.
+.PP
+The default server URL is
+.BR http://localhost:8080 .
+The command authenticates through the Maps REST login endpoint and refreshes the displayed
+statistics while it remains connected.
+.PP
+The lower display alternates automatically between destination and interface information.
+.SH ARGUMENTS
+.TP
+.I server-url
+Base URL of the Maps server REST interface.  The default is
+.BR http://localhost:8080 .
+.TP
+.I username
+Maps REST API user name.
+.TP
+.I password
+Maps REST API password.
+.SH KEYS
+.TP
+.B q
+Quit and restore the terminal.
+.SH DISPLAY
+The dashboard includes server time, uptime, CPU time, connection state, storage size, free
+and used memory, build information, thread status, topic totals, destination activity, and
+interface activity.
+.SH EXAMPLES
+Connect to a local server:
+.PP
+.EX
+maps-top
+.EE
+.PP
+Connect to a remote server:
+.PP
+.EX
+maps-top http://maps-edge:8080 operator secret
+.EE
+.SH SECURITY
+The current interface accepts the password as a positional command-line argument.  Command
+arguments may be visible to other users through process inspection and may be retained in
+shell history.  Avoid placing reusable administrative credentials directly on a shared
+system command line.
+.SH TERMINAL REQUIREMENTS
+The command requires an interactive terminal supported by Lanterna.  Run it directly from a
+terminal rather than from a non-interactive service or redirected output stream.
+.SH FILES
+.TP
+.I /opt/maps/apps/top.jar
+Executable JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.

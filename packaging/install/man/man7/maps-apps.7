@@ -1,0 +1,62 @@
+.TH MAPS-APPS 7 "20 July 2026" "maps-apps 1.0.0" "Miscellaneous Information"
+.SH NAME
+maps-apps \- operational and diagnostic applications for MapsMessaging
+.SH DESCRIPTION
+The
+.B maps-apps
+Debian package installs a collection of MapsMessaging administration, inspection, capture,
+and replay tools.  Application JARs are installed below
+.I /opt/maps/apps
+and command launchers are installed in
+.IR /usr/bin .
+.PP
+The package depends on the Maps server package and includes the Maps MQTT value logger
+systemd service.
+.SH COMMANDS
+.TP
+.BR maps-audit-viewer (1)
+Inspect and verify append-only Maps audit journals.
+.TP
+.BR maps-canbus-replay (1)
+Replay NDJSON CAN records to a SocketCAN interface.
+.TP
+.BR maps-udp-capture (1)
+Capture UDP datagrams to a replayable Maps UDP file.
+.TP
+.BR maps-udp-replay (1)
+Replay a Maps UDP capture file to a target address and port.
+.TP
+.BR maps-top (1)
+Display live Maps server statistics in a full-screen terminal.
+.SH SERVICES
+.TP
+.BR maps-logger (8)
+Subscribe to Maps MQTT messages and write rotating CSV or NDJSON logs.
+.TP
+.BR maps-logger.env (5)
+Configure the Maps MQTT value logger service.
+.SH FILES
+.TP
+.I /opt/maps/apps/
+Installed application JARs.
+.TP
+.I /usr/bin/maps-*
+Installed command launchers.
+.TP
+.I /etc/maps-logger/env
+Maps logger service configuration.
+.TP
+.I /var/log/maps-logger/
+Default Maps logger output directory.
+.SH SEE ALSO
+.BR maps-audit-viewer (1),
+.BR maps-canbus-replay (1),
+.BR maps-udp-capture (1),
+.BR maps-udp-replay (1),
+.BR maps-top (1),
+.BR maps-logger (8),
+.BR maps-logger.env (5)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.

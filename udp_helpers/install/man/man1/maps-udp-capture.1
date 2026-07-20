@@ -1,0 +1,78 @@
+.TH MAPS-UDP-CAPTURE 1 "20 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-udp-capture \- capture UDP datagrams to a replayable file
+.SH SYNOPSIS
+.B maps-udp-capture
+.BI --port " port"
+.BI --output " file"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-udp-capture
+binds a UDP socket, receives datagrams, and writes them to a Maps UDP capture file.  Each
+record includes a monotonic timestamp, source address, source port, and payload.
+.PP
+The capture file begins with the ASCII magic value
+.B MUDP
+and format version 1.  It is intended for use with
+.BR maps-udp-replay (1).
+.PP
+Press Ctrl-C to stop capture and close the output file.
+.SH OPTIONS
+.TP
+.BI --bind-address " address"
+Local address to bind.  The default is
+.BR 0.0.0.0 .
+.TP
+.BI --port " port"
+UDP port to capture.  Required.
+.TP
+.BI --output " file"
+Output capture file.  Required.  An existing file is replaced.
+.TP
+.BI --buffer-size " bytes"
+Maximum receive buffer allocated for each UDP packet.  The default is 65535 bytes.
+Datagrams larger than the selected buffer may be truncated by the socket receive operation.
+.TP
+.BI --flush-each-packet "[=boolean]"
+Flush the capture file after every packet.  The default is true.  Use
+.B --flush-each-packet=false
+to favour throughput over immediate durability.
+.TP
+.B --hex-dump
+Print each captured payload as hexadecimal in addition to the packet summary.
+.TP
+.B --quiet
+Disable per-packet logging.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH EXAMPLES
+Capture all traffic arriving on UDP port 10120:
+.PP
+.EX
+maps-udp-capture --port 10120 --output nmea.mudp
+.EE
+.PP
+Bind only to localhost and suppress packet logging:
+.PP
+.EX
+maps-udp-capture --bind-address 127.0.0.1 --port 14550 \
+  --output mavlink.mudp --quiet
+.EE
+.PP
+Capture with hexadecimal diagnostics:
+.PP
+.EX
+maps-udp-capture --port 14480 --output stickleback.mudp --hex-dump
+.EE
+.SH FILES
+.TP
+.I /opt/maps/apps/udp_helpers.jar
+Shared UDP helper JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-udp-replay (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.

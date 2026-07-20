@@ -1,0 +1,118 @@
+.TH MAPS-CANBUS-REPLAY 1 "20 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-canbus-replay \- replay recorded CAN frames to a SocketCAN interface
+.SH SYNOPSIS
+.B maps-canbus-replay
+.BI --dir " directory"
+.BI --interface " interface"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-canbus-replay
+loads CAN records from all
+.B .ndjson
+files below a directory, sorts the records by timestamp, and writes the resulting frames to
+a Linux SocketCAN interface.
+.PP
+Input records may be direct Maps envelopes or wrapper records whose
+.B opaqueData
+field contains a Base64-encoded JSON envelope.  Each replay envelope must provide a timestamp
+through
+.B meta.time_ms
+or
+.BR timestamp ,
+and a
+.B payload
+object containing
+.BR canId ,
+.BR extended ,
+.BR dlc ,
+and Base64-encoded
+.BR data .
+.PP
+Press Ctrl-C to stop an active replay.
+.SH OPTIONS
+.TP
+.BI --dir " directory"
+Directory to scan recursively for
+.B .ndjson
+files.  Required.
+.TP
+.BI --interface " interface"
+SocketCAN interface to write, for example
+.B vcan0
+or
+.BR can0 .
+Required.
+.TP
+.BI --iface " interface"
+Alias for
+.BR --interface .
+.TP
+.B --loop
+Restart the replay from the beginning after the final record.
+.TP
+.BI --speed " factor"
+Replay speed multiplier.  The default is 1.0.  A value of 10 replays timestamp gaps ten
+times faster.  The value must be greater than zero.
+.TP
+.BI --max-wait-ms " milliseconds"
+Accepted maximum wait setting.  The value must be zero or greater.
+See
+.B LIMITATIONS
+for current behaviour.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH INPUT FORMAT
+The loader scans recursively and accepts one JSON object per line.  Invalid records are
+reported to standard error and skipped.
+.PP
+A direct record has this general shape:
+.PP
+.EX
+{"meta":{"time_ms":1784500000000},"payload":{"canId":291,
+ "extended":false,"dlc":8,"data":"AQIDBAUGBwg="}}
+.EE
+.PP
+The
+.B data
+field is Base64 encoded.  DLC values from 0 through 64 are accepted, allowing both classic
+CAN and CAN FD records.
+.SH EXAMPLES
+Replay records to a virtual CAN interface:
+.PP
+.EX
+maps-canbus-replay --dir ./captures --interface vcan0
+.EE
+.PP
+Replay continuously at ten times the recorded speed:
+.PP
+.EX
+maps-canbus-replay --dir ./captures --interface can0 --loop --speed 10
+.EE
+.PP
+Replay without intentional timestamp delays after the current limitation is addressed:
+.PP
+.EX
+maps-canbus-replay --dir ./captures --interface vcan0 --max-wait-ms 0
+.EE
+.SH REQUIREMENTS
+The target SocketCAN interface must exist and be up.  The invoking user must have permission
+to open and write the interface.
+.SH LIMITATIONS
+The current command parses
+.B --max-wait-ms
+but the replay runner does not yet apply that value when calculating delays.  Timestamp gaps
+are currently controlled only by
+.BR --speed .
+.SH FILES
+.TP
+.I /opt/maps/apps/canbus_replay.jar
+Executable JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR ip-link (8),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.

@@ -1,0 +1,117 @@
+.TH MAPS-LOGGER 8 "20 July 2026" "maps-apps 1.0.0" "System Administration"
+.SH NAME
+maps-logger \- operate the Maps MQTT value logger service
+.SH SYNOPSIS
+.B systemctl
+.RI { start | stop | restart | status }
+.B maps-logger
+.SH DESCRIPTION
+.B maps-logger.service
+runs the Maps MQTT value logger as a standalone systemd service.  It subscribes to a Maps
+MQTT v5 topic and writes selected message envelope fields to hourly rotating CSV or NDJSON
+files.
+.PP
+The Debian package installs and enables the service, but does not start the logger on its
+first installation.  Review
+.I /etc/maps-logger/env
+and then start the service explicitly.  If the service is already active during a package
+upgrade, the package restarts it to load the new JAR.
+.PP
+A separate timer,
+.BR maps-logger-compress.timer ,
+runs hourly and compresses CSV and NDJSON files older than two hours.  Files are not deleted
+automatically.
+.SH INITIAL SETUP
+Edit the service environment:
+.PP
+.EX
+sudo editor /etc/maps-logger/env
+.EE
+.PP
+Start the logger:
+.PP
+.EX
+sudo systemctl start maps-logger
+.EE
+.PP
+The Maps server should transform local MQTT deliveries to Message-JSON so that envelope
+timestamps, QoS, protocol, session, and metadata fields are available to the logger.
+.SH SERVICE MANAGEMENT
+.TP
+Check service status:
+.EX
+systemctl status maps-logger --no-pager
+.EE
+.TP
+Follow service output:
+.EX
+journalctl -u maps-logger -f
+.EE
+.TP
+Restart after configuration changes:
+.EX
+sudo systemctl restart maps-logger
+.EE
+.TP
+Stop the service:
+.EX
+sudo systemctl stop maps-logger
+.EE
+.TP
+Inspect the compression timer:
+.EX
+systemctl status maps-logger-compress.timer --no-pager
+.EE
+.SH OUTPUT
+Hourly files are written below the configured output directory.  Example names are:
+.PP
+.EX
+/var/log/maps-logger/maps-2026-05-27-14.csv
+/var/log/maps-logger/maps-2026-05-27-15.ndjson
+/var/log/maps-logger/maps-2026-05-27-14.csv.gz
+.EE
+.PP
+The logger records local receive time, server timestamp, server time in milliseconds,
+calculated latency, topic, content type, identifier, QoS, protocol, session identifier, and
+metadata version.
+.SH DIAGNOSTICS
+If output records contain missing timestamps or metadata, verify the Maps server has a
+Message-JSON transformation for local MQTT connections.
+.PP
+To inspect recent failures:
+.PP
+.EX
+systemctl status maps-logger --no-pager
+journalctl -u maps-logger -n 100 --no-pager
+.EE
+.PP
+Disk-space warnings are written to the service journal when available space falls below
+.BR MAPS_LOGGER_DISK_WARN_MB .
+.SH FILES
+.TP
+.I /opt/maps/apps/mqtt_logger.jar
+Logger executable installed by the maps-apps Debian package.
+.TP
+.I /etc/maps-logger/env
+Service configuration.
+.TP
+.I /var/log/maps-logger/
+Default output directory.
+.TP
+.I /lib/systemd/system/maps-logger.service
+Logger systemd unit.
+.TP
+.I /lib/systemd/system/maps-logger-compress.service
+One-shot compression service.
+.TP
+.I /lib/systemd/system/maps-logger-compress.timer
+Hourly compression timer.
+.SH SEE ALSO
+.BR maps-logger.env (5),
+.BR systemctl (1),
+.BR journalctl (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.

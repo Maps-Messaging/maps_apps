@@ -1,0 +1,84 @@
+.TH MAPS-UDP-REPLAY 1 "20 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-udp-replay \- replay captured UDP datagrams to a target
+.SH SYNOPSIS
+.B maps-udp-replay
+.BI --input " file"
+.BI --target-address " address"
+.BI --target-port " port"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-udp-replay
+reads a Maps UDP capture file and sends each recorded payload to one target UDP address and
+port.  By default it preserves the spacing between captured packets and replays at normal
+speed.
+.PP
+The original source address and source port are retained in the capture file for diagnostics,
+but replayed packets are emitted from a new local UDP socket to the configured target.
+.SH OPTIONS
+.TP
+.BI --input " file"
+Input file created by
+.BR maps-udp-capture (1).
+Required.
+.TP
+.BI --target-address " address"
+Destination host name or IP address.  Required.
+.TP
+.BI --target-port " port"
+Destination UDP port.  Required.
+.TP
+.BI --preserve-timing "[=boolean]"
+Preserve recorded packet spacing.  The default is true.  Use
+.B --preserve-timing=false
+to send records without intentional delays.
+.TP
+.BI --speed " factor"
+Replay speed multiplier.  The default is 1.0.  A value of 2 halves recorded delays; a value
+of 0.5 doubles them.  Non-positive values are treated as 1.0 by the current implementation.
+.TP
+.B --loop
+Restart replay from the beginning after the final packet and continue until interrupted.
+.TP
+.B --hex-dump
+Print each sent payload as hexadecimal in addition to the packet summary.
+.TP
+.B --quiet
+Disable per-packet logging.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH EXAMPLES
+Replay a capture to localhost at the recorded rate:
+.PP
+.EX
+maps-udp-replay --input nmea.mudp \
+  --target-address 127.0.0.1 --target-port 10120
+.EE
+.PP
+Replay ten times faster and loop continuously:
+.PP
+.EX
+maps-udp-replay --input mavlink.mudp \
+  --target-address 192.0.2.20 --target-port 14550 \
+  --speed 10 --loop
+.EE
+.PP
+Send all records immediately:
+.PP
+.EX
+maps-udp-replay --input capture.mudp \
+  --target-address 127.0.0.1 --target-port 14480 \
+  --preserve-timing=false
+.EE
+.SH FILES
+.TP
+.I /opt/maps/apps/udp_helpers.jar
+Shared UDP helper JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-udp-capture (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.
