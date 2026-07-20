@@ -1,0 +1,19 @@
+steps:
+  - label: ":java: Build maps_apps"
+    key: "build"
+    command:
+      - "mvn --batch-mode clean verify"
+    artifact_paths:
+      - "*/target/*.jar"
+
+  - label: ":debian: Build maps-apps package"
+    depends_on: "build"
+    command:
+      - "./packaging/scripts/build-debian.sh"
+      - "dpkg-deb --info packaging/output/*.deb"
+      - "dpkg-deb --contents packaging/output/*.deb"
+    artifact_paths:
+      - "packaging/output/*.deb"
+
+    agents:
+      queue: "java_build_queue"
