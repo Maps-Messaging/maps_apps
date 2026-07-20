@@ -5,15 +5,23 @@ steps:
       - "mvn --batch-mode clean verify"
     artifact_paths:
       - "*/target/*.jar"
+    agents:
+      queue: "java_build_queue"
 
-  - label: ":debian: Build maps-apps package"
+  - label: ":debian: Build and publish maps-apps package"
+    key: "debian"
     depends_on: "build"
     command:
-      - "./packaging/scripts/build-debian.sh"
+      - 'buildkite-agent artifact download "*/target/*.jar" . --step build'
+      - "chmod +x ./packaging/scripts/build_deb_package.sh"
+      - >
+        ./packaging/scripts/build_deb_package.sh
+        "$(buildkite-agent secret get NEXUS_USER)"
+        "$(buildkite-agent secret get NEXUS_PASSWORD)"
+        maps_apt_daily
       - "dpkg-deb --info packaging/output/*.deb"
       - "dpkg-deb --contents packaging/output/*.deb"
     artifact_paths:
       - "packaging/output/*.deb"
-
     agents:
       queue: "java_build_queue"
