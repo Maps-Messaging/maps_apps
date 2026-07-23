@@ -1,3 +1,0 @@
-#!/bin/sh
-exec java -cp /opt/maps/apps/udp_helpers.jar \
-  io.mapsmessaging.tools.udphelpers.UdpCaptureMain "$@"
