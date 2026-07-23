@@ -1,6 +1,6 @@
 # Debian packaging
 
-The `maps-apps` Debian package contains the shaded JAR produced by every Maven module declared in the root `pom.xml`.
+The `maps-apps` Debian package contains the deployable JAR produced by every Maven module declared in the root `pom.xml`.
 
 ## Installed files
 
@@ -10,13 +10,9 @@ Application JARs are installed under:
 /opt/maps/apps
 ```
 
-A launcher is generated for each Maven module under `/usr/bin`. Module underscores are converted to hyphens. Examples:
+Commands supplied by each module's `install/bin` directory are installed under `/usr/bin`. Modules without explicit launchers receive a generated `maps-<module>` launcher.
 
-```text
-mqtt_logger   -> /usr/bin/maps-mqtt-logger
-canbus_replay -> /usr/bin/maps-canbus-replay
-udp_helpers   -> /usr/bin/maps-udp-helpers
-```
+Manual pages supplied under either `<module>/install/man/man<section>` or `packaging/install/man/man<section>` are compressed and installed below `/usr/share/man`.
 
 The package depends on the `maps` Debian package.
 
@@ -46,6 +42,7 @@ Maven snapshot versions are converted from `1.0.0-SNAPSHOT` to the Debian-compat
 
 - Maven
 - `dpkg-deb`
+- `gzip`
 - completed module builds under each module's `target` directory
 
-The packaging script does not invoke the Maven build. This keeps Java compilation and Debian assembly as separate stages.
+The packaging script does not invoke the Maven build. Java compilation and Debian assembly remain separate pipeline stages.

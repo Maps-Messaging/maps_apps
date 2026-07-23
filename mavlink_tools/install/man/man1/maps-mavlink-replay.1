@@ -1,0 +1,82 @@
+.TH MAPS-MAVLINK-REPLAY 1 "23 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-mavlink-replay \- replay MAVLink capture files to UDP
+.SH SYNOPSIS
+.B maps-mavlink-replay
+.BI --input " file ..."
+.BI --target-address " address"
+.BI --target-port " port"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-mavlink-replay
+reads one or more MAVLink capture files and sends their frames to a UDP destination. Multiple inputs are merged onto one timeline so vehicle logs remain synchronised.
+.PP
+Supported formats are QGroundControl TLOG, Maps MUDP captures, legacy comma-separated Base64 DAT captures, and raw MAVLink byte streams.
+.SH OPTIONS
+.TP
+.BI -i " file ...", " --input " "file ..."
+One or more input files. Required.
+.TP
+.BI --target-address " address"
+Destination host name or IP address. Required.
+.TP
+.BI --target-port " port"
+Destination UDP port. Required.
+.TP
+.BI --format " format"
+Input format: auto, tlog, mudp, legacy-dat, or raw. The default is auto.
+.TP
+.BI --speed " factor"
+Replay speed multiplier. The default is 1.0. A value of 2 replays at twice the recorded speed.
+.TP
+.B --loop
+Restart all inputs together after replay completes.
+.TP
+.BI --start-offset " offset"
+Skip frames before the supplied offset.
+.TP
+.BI --end-offset " offset"
+Stop after the supplied offset.
+.TP
+.BI --raw-delay " offset"
+Delay between frames in a raw stream. The default is zero.
+.TP
+.BI --system-id " id[,id...]"
+Replay only matching MAVLink system IDs.
+.TP
+.BI --component-id " id[,id...]"
+Replay only matching MAVLink component IDs.
+.TP
+.BI --message-id " id[,id...]"
+Replay only matching MAVLink message IDs.
+.TP
+.B --verbose
+Print information for every transmitted frame.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH OFFSETS
+Offsets accept seconds, MM:SS, HH:MM:SS, or an integer followed by ms, s, m, or h.
+.SH EXAMPLES
+.EX
+maps-mavlink-replay --input flight.tlog \
+  --target-address 127.0.0.1 --target-port 14550
+.EE
+.PP
+.EX
+maps-mavlink-replay --input vehicle-1.tlog vehicle-2.tlog \
+  --target-address 127.0.0.1 --target-port 14450 \
+  --start-offset 01:15 --end-offset 05:00 --speed 2 --loop
+.EE
+.SH FILES
+.TP
+.I /opt/maps/apps/mavlink_tools.jar
+MAVLink tools JAR installed by the maps-apps package.
+.SH SEE ALSO
+.BR maps-mavlink-inspect (1),
+.BR maps-mavlink-convert (1),
+.BR maps-udp-capture (1),
+.BR maps-udp-replay (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.

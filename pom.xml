@@ -15,8 +15,7 @@
  ~  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  ~  See the License for the specific language governing permissions and
  ~  limitations under the License.
-  -->
-
+ -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -36,6 +35,7 @@
         <module>mqtt_logger</module>
         <module>audit_viewer</module>
         <module>udp_helpers</module>
+        <module>mavlink_tools</module>
         <module>canbus_replay</module>
         <module>top</module>
     </modules>
@@ -73,7 +73,7 @@
     <scm>
         <url>https://github.com/Maps-Messaging/maps_apps</url>
         <connection>scm:git:https://github.com/Maps-Messaging/maps_apps.git</connection>
-        <developerConnection>scm:git:git@github.com/Maps-Messaging/maps_apps.git</developerConnection>
+        <developerConnection>scm:git:git@github.com:Maps-Messaging/maps_apps.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
@@ -124,6 +124,7 @@
             <url>https://repository.mapsmessaging.io/repository/maps_snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
+
     <repositories>
         <repository>
             <id>maps_snapshots</id>
@@ -140,7 +141,6 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- External dependencies -->
             <dependency>
                 <groupId>com.google.code.gson</groupId>
                 <artifactId>gson</artifactId>
@@ -170,7 +170,6 @@
                 <artifactId>lombok</artifactId>
                 <version>${version.lombok}</version>
             </dependency>
-
         </dependencies>
     </dependencyManagement>
 

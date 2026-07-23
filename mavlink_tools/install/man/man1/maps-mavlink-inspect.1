@@ -1,0 +1,58 @@
+.TH MAPS-MAVLINK-INSPECT 1 "23 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-mavlink-inspect \- inspect MAVLink frames in capture files
+.SH SYNOPSIS
+.B maps-mavlink-inspect
+.BI --input " file ..."
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-mavlink-inspect
+prints MAVLink header information for frames read from TLOG, MUDP, legacy DAT, or raw captures. Output includes MAVLink version, system ID, component ID, message ID, sequence, payload length, signing flag, packet length, and the CRC field stored in the frame.
+.PP
+The command parses packet structure but does not validate message-specific CRC extra values.
+.SH OPTIONS
+.TP
+.BI -i " file ...", " --input " "file ..."
+One or more input files. Required.
+.TP
+.BI --format " format"
+Input format: auto, tlog, mudp, legacy-dat, or raw. The default is auto.
+.TP
+.BI --start-offset " offset"
+Skip frames before the supplied offset.
+.TP
+.BI --end-offset " offset"
+Stop after the supplied offset.
+.TP
+.BI --raw-delay " offset"
+Timeline delay between frames in a raw stream. The default is zero.
+.TP
+.BI --system-id " id[,id...]"
+Display only matching MAVLink system IDs.
+.TP
+.BI --component-id " id[,id...]"
+Display only matching MAVLink component IDs.
+.TP
+.BI --message-id " id[,id...]"
+Display only matching MAVLink message IDs.
+.TP
+.BI --limit " count"
+Stop after displaying the requested number of matching frames. Zero means unlimited.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH EXAMPLES
+.EX
+maps-mavlink-inspect --input flight.tlog --limit 20
+.EE
+.PP
+.EX
+maps-mavlink-inspect --input flight.tlog \
+  --system-id 10 --message-id 0,24,33,74
+.EE
+.SH SEE ALSO
+.BR maps-mavlink-replay (1),
+.BR maps-mavlink-convert (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.

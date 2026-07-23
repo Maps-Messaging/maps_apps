@@ -14,16 +14,14 @@ LOGGER_SYSTEMD_SOURCE="${LOGGER_INSTALL_SOURCE}/systemd"
 LOGGER_CONFIG_DIR="/etc/maps-logger"
 LOGGER_LOG_DIR="/var/log/maps-logger"
 SYSTEMD_DIR="/lib/systemd/system"
+MAN_DIR="/usr/share/man"
 
-command -v dpkg-deb >/dev/null 2>&1 || {
-  echo "dpkg-deb is required" >&2
-  exit 1
-}
-
-command -v mvn >/dev/null 2>&1 || {
-  echo "mvn is required" >&2
-  exit 1
-}
+for required_command in dpkg-deb mvn gzip; do
+  command -v "${required_command}" >/dev/null 2>&1 || {
+    echo "${required_command} is required" >&2
+    exit 1
+  }
+done
 
 MAVEN_VERSION="$(
   mvn \
@@ -47,13 +45,14 @@ PACKAGE_ROOT="${WORK_DIR}/${PACKAGE_NAME}_${DEBIAN_VERSION}_${ARCHITECTURE}"
 PACKAGE_INSTALL_DIR="${PACKAGE_ROOT}${INSTALL_DIR}"
 PACKAGE_BIN_DIR="${PACKAGE_ROOT}/usr/bin"
 PACKAGE_CONTROL_DIR="${PACKAGE_ROOT}/DEBIAN"
+PACKAGE_MAN_DIR="${PACKAGE_ROOT}${MAN_DIR}"
 
 rm -rf "${PACKAGE_ROOT}"
-
 mkdir -p \
   "${PACKAGE_CONTROL_DIR}" \
   "${PACKAGE_INSTALL_DIR}" \
   "${PACKAGE_BIN_DIR}" \
+  "${PACKAGE_MAN_DIR}" \
   "${OUTPUT_DIR}"
 
 mapfile -t MODULES < <(
@@ -88,8 +87,8 @@ find_module_jar() {
       ! -name '*-javadoc.jar' \
       ! -name '*-tests.jar' \
       -printf '%T@ %p\n' |
-      sort -nr |
-      cut -d' ' -f2-
+    sort -nr |
+    cut -d' ' -f2-
   )
 
   if [[ ${#jars[@]} -eq 0 ]]; then
@@ -103,31 +102,25 @@ find_module_jar() {
 install_module_jar() {
   local module="$1"
   local jar_file="$2"
-  local installed_name="${module}.jar"
 
   install \
     -m 0644 \
     "${jar_file}" \
-    "${PACKAGE_INSTALL_DIR}/${installed_name}"
+    "${PACKAGE_INSTALL_DIR}/${module}.jar"
 
   echo "Included module ${module}: $(basename "${jar_file}")"
 }
 
-install_cli_module() {
+install_default_launcher() {
   local module="$1"
-  local jar_file="$2"
-  local installed_name="${module}.jar"
   local command_name="maps-${module//_/-}"
 
-  install_module_jar "${module}" "${jar_file}"
-
-  cat > "${PACKAGE_BIN_DIR}/${command_name}" <<EOF
+  cat > "${PACKAGE_BIN_DIR}/${command_name}" <<EOF_LAUNCHER
 #!/bin/sh
-exec java -jar "${INSTALL_DIR}/${installed_name}" "\$@"
-EOF
+exec java -jar "${INSTALL_DIR}/${module}.jar" "\$@"
+EOF_LAUNCHER
 
   chmod 0755 "${PACKAGE_BIN_DIR}/${command_name}"
-
   echo "Included CLI command ${command_name}"
 }
 
@@ -160,19 +153,46 @@ install_module_launchers() {
       -maxdepth 1 \
       -type f \
       -print0 |
-      sort -z
+    sort -z
   )
 }
 
-install_logger_module() {
-  local jar_file="$1"
+install_man_tree() {
+  local source_root="$1"
+  local man_page
+  local relative_path
+  local section_directory
+  local destination_directory
+  local destination_file
 
-  install \
-    -m 0644 \
-    "${jar_file}" \
-    "${PACKAGE_INSTALL_DIR}/${LOGGER_MODULE}.jar"
+  if [[ ! -d "${source_root}" ]]; then
+    return
+  fi
 
-  echo "Included service module ${LOGGER_MODULE}: $(basename "${jar_file}")"
+  while IFS= read -r -d '' man_page; do
+    relative_path="${man_page#${source_root}/}"
+    section_directory="$(dirname "${relative_path}")"
+    destination_directory="${PACKAGE_MAN_DIR}/${section_directory}"
+    destination_file="${destination_directory}/$(basename "${man_page}").gz"
+
+    if [[ -e "${destination_file}" ]]; then
+      echo "Duplicate manual page: ${relative_path}" >&2
+      exit 1
+    fi
+
+    mkdir -p "${destination_directory}"
+    gzip -9 -n -c "${man_page}" > "${destination_file}"
+    chmod 0644 "${destination_file}"
+    echo "Included manual page ${relative_path}"
+  done < <(
+    find "${source_root}" \
+      -mindepth 2 \
+      -maxdepth 2 \
+      -type f \
+      -path '*/man[1-9]/*' \
+      -print0 |
+    sort -z
+  )
 }
 
 validate_logger_resources() {
@@ -183,7 +203,6 @@ validate_logger_resources() {
     "${LOGGER_SYSTEMD_SOURCE}/maps-logger-compress.service"
     "${LOGGER_SYSTEMD_SOURCE}/maps-logger-compress.timer"
   )
-
   local file
 
   for file in "${required_files[@]}"; do
@@ -212,8 +231,7 @@ install_logger_resources() {
     "${LOGGER_SYSTEMD_SOURCE}/maps-logger.service" \
     > "${PACKAGE_ROOT}${SYSTEMD_DIR}/maps-logger.service"
 
-  chmod 0644 \
-    "${PACKAGE_ROOT}${SYSTEMD_DIR}/maps-logger.service"
+  chmod 0644 "${PACKAGE_ROOT}${SYSTEMD_DIR}/maps-logger.service"
 
   install \
     -m 0644 \
@@ -225,9 +243,9 @@ install_logger_resources() {
     "${LOGGER_SYSTEMD_SOURCE}/maps-logger-compress.timer" \
     "${PACKAGE_ROOT}${SYSTEMD_DIR}/maps-logger-compress.timer"
 
-  cat > "${PACKAGE_CONTROL_DIR}/conffiles" <<EOF
+  cat > "${PACKAGE_CONTROL_DIR}/conffiles" <<EOF_CONFFILES
 ${LOGGER_CONFIG_DIR}/env
-EOF
+EOF_CONFFILES
 
   echo "Included MQTT logger systemd units and configuration"
 }
@@ -236,19 +254,23 @@ for module in "${MODULES[@]}"; do
   jar_file="$(find_module_jar "${module}")"
   launcher_dir="${ROOT_DIR}/${module}/install/bin"
 
-  if [[ "${module}" == "${LOGGER_MODULE}" ]]; then
-    install_logger_module "${jar_file}"
-  elif [[ -d "${launcher_dir}" ]]; then
-    install_module_jar "${module}" "${jar_file}"
-    install_module_launchers "${module}"
-  else
-    install_cli_module "${module}" "${jar_file}"
+  install_module_jar "${module}" "${jar_file}"
+
+  if [[ "${module}" != "${LOGGER_MODULE}" ]]; then
+    if [[ -d "${launcher_dir}" ]]; then
+      install_module_launchers "${module}"
+    else
+      install_default_launcher "${module}"
+    fi
   fi
+
+  install_man_tree "${ROOT_DIR}/${module}/install/man"
 done
 
 install_logger_resources
+install_man_tree "${ROOT_DIR}/packaging/install/man"
 
-cat > "${PACKAGE_CONTROL_DIR}/control" <<EOF
+cat > "${PACKAGE_CONTROL_DIR}/control" <<EOF_CONTROL
 Package: ${PACKAGE_NAME}
 Version: ${DEBIAN_VERSION}
 Section: utils
@@ -262,9 +284,9 @@ Description: MapsMessaging command-line applications
  installed under ${INSTALL_DIR}.
  .
  Includes the MAPS MQTT value logger systemd service and compression timer.
-EOF
+EOF_CONTROL
 
-cat > "${PACKAGE_CONTROL_DIR}/postinst" <<'EOF'
+cat > "${PACKAGE_CONTROL_DIR}/postinst" <<'EOF_POSTINST'
 #!/bin/sh
 set -e
 
@@ -281,9 +303,9 @@ if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
 fi
 
 exit 0
-EOF
+EOF_POSTINST
 
-cat > "${PACKAGE_CONTROL_DIR}/prerm" <<'EOF'
+cat > "${PACKAGE_CONTROL_DIR}/prerm" <<'EOF_PRERM'
 #!/bin/sh
 set -e
 
@@ -296,9 +318,9 @@ if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
 fi
 
 exit 0
-EOF
+EOF_PRERM
 
-cat > "${PACKAGE_CONTROL_DIR}/postrm" <<'EOF'
+cat > "${PACKAGE_CONTROL_DIR}/postrm" <<'EOF_POSTRM'
 #!/bin/sh
 set -e
 
@@ -307,7 +329,7 @@ if [ -d /run/systemd/system ]; then
 fi
 
 exit 0
-EOF
+EOF_POSTRM
 
 chmod 0755 \
   "${PACKAGE_CONTROL_DIR}/postinst" \
@@ -315,7 +337,6 @@ chmod 0755 \
   "${PACKAGE_CONTROL_DIR}/postrm"
 
 OUTPUT_FILE="${OUTPUT_DIR}/${PACKAGE_NAME}_${DEBIAN_VERSION}_${ARCHITECTURE}.deb"
-
 rm -f "${OUTPUT_FILE}"
 
 dpkg-deb \
@@ -333,7 +354,7 @@ find "${PACKAGE_INSTALL_DIR}" \
   -maxdepth 1 \
   -type f \
   -printf '  %f\n' |
-  sort
+sort
 
 echo
 echo "Installed commands:"
@@ -341,7 +362,14 @@ find "${PACKAGE_BIN_DIR}" \
   -maxdepth 1 \
   -type f \
   -printf '  %f\n' |
-  sort
+sort
+
+echo
+echo "Installed manual pages:"
+find "${PACKAGE_MAN_DIR}" \
+  -type f \
+  -printf '  %P\n' |
+sort
 
 echo
 echo "Installed systemd units:"
@@ -349,4 +377,4 @@ find "${PACKAGE_ROOT}${SYSTEMD_DIR}" \
   -maxdepth 1 \
   -type f \
   -printf '  %f\n' |
-  sort
+sort
