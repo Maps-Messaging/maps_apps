@@ -10,8 +10,8 @@ Standalone operational and diagnostic applications for the [MapsMessaging](https
 | [`audit_viewer`](audit_viewer/README.md) | `maps-audit-viewer` | Read and verify tamper-evident Maps audit journals |
 | [`udp_helpers`](udp_helpers/README.md) | `maps-udp-capture`, `maps-udp-replay`, `maps-udp-stream-convert` | Capture, replay, and convert packet-oriented UDP streams |
 | [`mavlink_tools`](mavlink_tools/README.md) | `maps-mavlink-replay`, `maps-mavlink-inspect`, `maps-mavlink-convert` | Inspect, convert, and replay MAVLink captures |
-| [`canbus_replay`](canbus_replay/README.md) | `maps-canbus-replay` | Replay NDJSON CAN records to SocketCAN |
-| [`top`](top/README.md) | `maps-top` | Display live Maps server statistics in a terminal |
+| `canbus_replay` | `maps-canbus-replay` | Replay NDJSON CAN records to SocketCAN |
+| `top` | `maps-top` | Display live Maps server statistics in a terminal |
 
 ## Build
 
