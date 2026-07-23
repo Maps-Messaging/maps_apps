@@ -1,17 +1,15 @@
-.TH MAPS-APPS 7 "20 July 2026" "maps-apps 1.0.0" "Miscellaneous Information"
+.TH MAPS-APPS 7 "23 July 2026" "maps-apps 1.0.0" "Miscellaneous Information"
 .SH NAME
 maps-apps \- operational and diagnostic applications for MapsMessaging
 .SH DESCRIPTION
 The
 .B maps-apps
-Debian package installs a collection of MapsMessaging administration, inspection, capture,
-and replay tools.  Application JARs are installed below
+Debian package installs a collection of MapsMessaging administration, inspection, capture, conversion, and replay tools. Application JARs are installed below
 .I /opt/maps/apps
 and command launchers are installed in
 .IR /usr/bin .
 .PP
-The package depends on the Maps server package and includes the Maps MQTT value logger
-systemd service.
+The package depends on the Maps server package and includes the Maps MQTT value logger systemd service.
 .SH COMMANDS
 .TP
 .BR maps-audit-viewer (1)
@@ -19,6 +17,15 @@ Inspect and verify append-only Maps audit journals.
 .TP
 .BR maps-canbus-replay (1)
 Replay NDJSON CAN records to a SocketCAN interface.
+.TP
+.BR maps-mavlink-convert (1)
+Convert MAVLink captures into the Maps MUDP format.
+.TP
+.BR maps-mavlink-inspect (1)
+Inspect MAVLink frame headers and filter capture contents.
+.TP
+.BR maps-mavlink-replay (1)
+Replay MAVLink TLOG, MUDP, legacy DAT, or raw captures to UDP.
 .TP
 .BR maps-udp-capture (1)
 Capture UDP datagrams to a replayable Maps UDP file.
@@ -43,6 +50,9 @@ Installed application JARs.
 .I /usr/bin/maps-*
 Installed command launchers.
 .TP
+.I /usr/share/man/man*/
+Compressed manual pages installed by the package.
+.TP
 .I /etc/maps-logger/env
 Maps logger service configuration.
 .TP
@@ -51,6 +61,9 @@ Default Maps logger output directory.
 .SH SEE ALSO
 .BR maps-audit-viewer (1),
 .BR maps-canbus-replay (1),
+.BR maps-mavlink-convert (1),
+.BR maps-mavlink-inspect (1),
+.BR maps-mavlink-replay (1),
 .BR maps-udp-capture (1),
 .BR maps-udp-replay (1),
 .BR maps-top (1),
