@@ -19,9 +19,11 @@ Live UDP recording remains the responsibility of `maps-udp-capture`. This module
 | QGroundControl TLOG | `.tlog` | Eight-byte big-endian microsecond timestamp before each MAVLink frame |
 | Maps UDP capture | `.mudp`, `.udp` | Versioned binary format produced by `maps-udp-capture` or `maps-mavlink-convert` |
 | Legacy demo capture | `.dat`, `.csv` | Text records using `<delay_ms>,<base64_payload>` |
-| Raw MAVLink stream | `.raw`, `.rlog`, `.bin` | MAVLink frames scanned from a byte stream; use `--raw-delay` when timing is required |
+| Raw MAVLink stream | `.raw`, `.bin` | MAVLink frames scanned from a byte stream; use `--raw-delay` when timing is required |
 
 `--format auto` detects MUDP files by their header and otherwise uses the filename extension. Explicit values are `auto`, `tlog`, `mudp`, `legacy-dat`, and `raw`.
+
+Mission Planner `.rlog` files are not treated as a supported replay format because they can contain debug output mixed with MAVLink data. They may be examined explicitly with `--format raw`, but reliable replay should use the corresponding `.tlog` file.
 
 ## Capture live MAVLink UDP traffic
 
