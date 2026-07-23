@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>MAVLink Tools</name>
-    <description>Inspect, convert, and replay MAVLink capture files</description>
+    <description>Inspect, convert, extract, rewrite, and replay MAVLink capture files</description>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -60,6 +60,12 @@
             <groupId>io.mapsmessaging</groupId>
             <artifactId>udp_helpers</artifactId>
             <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.mapsmessaging</groupId>
+            <artifactId>mavlink</artifactId>
+            <version>2.0.0</version>
         </dependency>
 
         <dependency>
