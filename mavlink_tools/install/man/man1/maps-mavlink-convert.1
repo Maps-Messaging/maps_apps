@@ -1,0 +1,68 @@
+.TH MAPS-MAVLINK-CONVERT 1 "23 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-mavlink-convert \- convert MAVLink captures to the Maps MUDP format
+.SH SYNOPSIS
+.B maps-mavlink-convert
+.BI --input " file ..."
+.BI --output " file"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-mavlink-convert
+reads MAVLink TLOG, MUDP, legacy DAT, or raw captures and writes a versioned Maps UDP capture. Multiple timestamped inputs are merged chronologically. The first output frame is timestamped at zero and later packet spacing is preserved.
+.SH OPTIONS
+.TP
+.BI -i " file ...", " --input " "file ..."
+One or more input files. Required.
+.TP
+.BI -o " file", " --output " "file"
+Output MUDP file. Required. Existing output is replaced.
+.TP
+.BI --format " format"
+Input format: auto, tlog, mudp, legacy-dat, or raw. The default is auto.
+.TP
+.BI --start-offset " offset"
+Skip frames before the supplied offset.
+.TP
+.BI --end-offset " offset"
+Stop after the supplied offset.
+.TP
+.BI --raw-delay " offset"
+Delay between frames in a raw stream. The default is zero.
+.TP
+.BI --source-address " address"
+Source address stored in generated MUDP records. The default is 127.0.0.1.
+.TP
+.BI --source-port " port"
+Source port stored in generated MUDP records. The default is zero.
+.TP
+.BR --flush-each-packet , " --no-flush-each-packet"
+Enable or disable flushing after every generated packet. Flushing is enabled by default.
+.TP
+.BI --system-id " id[,id...]"
+Include only matching MAVLink system IDs.
+.TP
+.BI --component-id " id[,id...]"
+Include only matching MAVLink component IDs.
+.TP
+.BI --message-id " id[,id...]"
+Include only matching MAVLink message IDs.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH EXAMPLES
+.EX
+maps-mavlink-convert --input flight.tlog --output flight.mudp
+.EE
+.PP
+.EX
+maps-mavlink-convert --input vehicle-1.tlog vehicle-2.tlog \
+  --output mission.mudp --start-offset 03:35 --end-offset 05:00
+.EE
+.SH SEE ALSO
+.BR maps-mavlink-replay (1),
+.BR maps-mavlink-inspect (1),
+.BR maps-udp-capture (1),
+.BR maps-udp-replay (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
