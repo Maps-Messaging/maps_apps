@@ -21,13 +21,12 @@ public class TlogReplaySource implements ReplaySource {
 
   @Override
   public ReplayFrame nextFrame() throws IOException {
-    long timestampNanos;
-    try {
-      timestampNanos = Math.multiplyExact(readTimestampMicros(), 1_000L);
-    } catch (EOFException exception) {
+    Long timestampMicros = readTimestampMicros();
+    if (timestampMicros == null) {
       return null;
     }
 
+    long timestampNanos = Math.multiplyExact(timestampMicros, 1_000L);
     byte[] packetData = mavlinkPacketReader.readPacket(inputStream);
     if (packetData == null) {
       throw new EOFException("TLOG ended after a timestamp without a MAVLink frame");
@@ -48,22 +47,24 @@ public class TlogReplaySource implements ReplaySource {
     inputStream.close();
   }
 
-  private long readTimestampMicros() throws IOException {
-    byte[] timestampBuffer = inputStream.readNBytes(Long.BYTES);
-    if (timestampBuffer.length == 0) {
-      throw new EOFException("End of tlog");
+  private Long readTimestampMicros() throws IOException {
+    int firstByte = inputStream.read();
+    if (firstByte < 0) {
+      return null;
     }
-    if (timestampBuffer.length != Long.BYTES) {
+
+    byte[] remainingBytes = inputStream.readNBytes(Long.BYTES - 1);
+    if (remainingBytes.length != Long.BYTES - 1) {
       throw new EOFException("Truncated tlog timestamp");
     }
 
-    return ((long) timestampBuffer[0] & 0xFF) << 56
-        | ((long) timestampBuffer[1] & 0xFF) << 48
-        | ((long) timestampBuffer[2] & 0xFF) << 40
-        | ((long) timestampBuffer[3] & 0xFF) << 32
-        | ((long) timestampBuffer[4] & 0xFF) << 24
-        | ((long) timestampBuffer[5] & 0xFF) << 16
-        | ((long) timestampBuffer[6] & 0xFF) << 8
-        | ((long) timestampBuffer[7] & 0xFF);
+    return ((long) firstByte & 0xFF) << 56
+        | ((long) remainingBytes[0] & 0xFF) << 48
+        | ((long) remainingBytes[1] & 0xFF) << 40
+        | ((long) remainingBytes[2] & 0xFF) << 32
+        | ((long) remainingBytes[3] & 0xFF) << 24
+        | ((long) remainingBytes[4] & 0xFF) << 16
+        | ((long) remainingBytes[5] & 0xFF) << 8
+        | ((long) remainingBytes[6] & 0xFF);
   }
 }
