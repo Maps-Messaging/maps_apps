@@ -1,6 +1,6 @@
 # MAVLink Tools
 
-`mavlink_tools` provides supported command-line applications for inspecting, converting, and replaying MAVLink captures. The tools are installed by the `maps-apps` Debian package.
+`mavlink_tools` provides supported command-line applications for inspecting, converting, extracting, rewriting, and replaying MAVLink captures. The tools are installed by the `maps-apps` Debian package.
 
 ## Commands
 
@@ -9,6 +9,8 @@
 | `maps-mavlink-replay` | Replay one or more MAVLink captures to a UDP destination |
 | `maps-mavlink-inspect` | Display MAVLink frame header information and apply frame filters |
 | `maps-mavlink-convert` | Convert captures into the versioned Maps UDP capture format (`MUDP`) |
+| `maps-mavlink-tlog-tail` | Extract the final duration from a TLOG without altering packets or timestamps |
+| `maps-mavlink-tlog-system-id` | Rewrite a system ID in a TLOG and recalculate MAVLink checksums |
 
 Live UDP recording remains the responsibility of `maps-udp-capture`. This module adds MAVLink-aware file handling rather than introducing a second UDP recorder.
 
@@ -105,6 +107,45 @@ maps-mavlink-convert \
 
 The first output frame is timestamped at zero. Later records retain their relative spacing. The output can be replayed by either `maps-mavlink-replay` or `maps-udp-replay`.
 
+## Extract the tail of a TLOG
+
+Extract the final 40 minutes while preserving every selected timestamp and MAVLink packet byte:
+
+```bash
+maps-mavlink-tlog-tail \
+  original.tlog \
+  final-40-minutes.tlog \
+  40:00
+```
+
+The extractor scans the TLOG to find its ending timestamp, then copies records whose timestamps fall inside the requested tail. It does not rewrite system IDs or recalculate checksums.
+
+## Rewrite a TLOG system ID
+
+Rewrite system ID `1` to `10` throughout a TLOG:
+
+```bash
+maps-mavlink-tlog-system-id \
+  original.tlog \
+  rewritten.tlog \
+  1 \
+  10
+```
+
+Restrict rewriting to a time window:
+
+```bash
+maps-mavlink-tlog-system-id \
+  original.tlog \
+  rewritten.tlog \
+  1 \
+  10 \
+  --start-offset 05:00 \
+  --end-offset 20:00
+```
+
+The command preserves original TLOG timestamps and non-target frames. It recalculates MAVLink 1 and unsigned MAVLink 2 checksums using the built-in `common` dialect. Use `--dialect-file` when the capture contains messages from another dialect. Signed MAVLink 2 frames are rejected because changing the system ID also invalidates the signature and a signing key is required to produce a replacement.
+
 ## Installation
 
 ```bash
@@ -117,6 +158,8 @@ Manual pages:
 man maps-mavlink-replay
 man maps-mavlink-inspect
 man maps-mavlink-convert
+man maps-mavlink-tlog-tail
+man maps-mavlink-tlog-system-id
 ```
 
 ## Build

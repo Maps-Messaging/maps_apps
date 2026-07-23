@@ -1,0 +1,38 @@
+.TH MAPS-MAVLINK-TLOG-TAIL 1 "23 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-mavlink-tlog-tail \- extract the final duration from a MAVLink TLOG
+.SH SYNOPSIS
+.B maps-mavlink-tlog-tail
+.I input.tlog output.tlog duration
+.SH DESCRIPTION
+.B maps-mavlink-tlog-tail
+scans a timestamped MAVLink TLOG and writes only records from its final requested duration. Original timestamps and MAVLink packet bytes are copied unchanged.
+.PP
+The command does not rewrite system IDs, recalculate checksums, or alter packet contents.
+.SH ARGUMENTS
+.TP
+.I input.tlog
+Input TLOG file.
+.TP
+.I output.tlog
+Output TLOG file. It must differ from the input file.
+.TP
+.I duration
+Tail duration. Accepted forms are seconds, MM:SS, HH:MM:SS, or an integer followed by ms, s, m, or h.
+.SH EXAMPLES
+Extract the final 40 minutes:
+.PP
+.EX
+maps-mavlink-tlog-tail original.tlog final-40-minutes.tlog 40:00
+.EE
+.SH FILES
+.TP
+.I /opt/maps/apps/mavlink_tools.jar
+MAVLink tools JAR installed by the maps-apps package.
+.SH SEE ALSO
+.BR maps-mavlink-tlog-system-id (1),
+.BR maps-mavlink-replay (1),
+.BR maps-mavlink-inspect (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.

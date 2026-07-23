@@ -1,0 +1,61 @@
+.TH MAPS-MAVLINK-TLOG-SYSTEM-ID 1 "23 July 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-mavlink-tlog-system-id \- rewrite a MAVLink system ID in a TLOG
+.SH SYNOPSIS
+.B maps-mavlink-tlog-system-id
+.I input.tlog output.tlog old-system-id new-system-id
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-mavlink-tlog-system-id
+copies a MAVLink TLOG while replacing matching source system IDs. MAVLink 1 and unsigned MAVLink 2 checksums are recalculated using the selected dialect.
+.PP
+Original TLOG timestamps and all non-target frames are preserved. Signed MAVLink 2 frames cannot be rewritten without their signing key and cause the command to fail.
+.SH ARGUMENTS
+.TP
+.I input.tlog
+Input TLOG file.
+.TP
+.I output.tlog
+Output TLOG file. It must differ from the input file.
+.TP
+.I old-system-id
+System ID to replace, from 0 through 255.
+.TP
+.I new-system-id
+Replacement system ID, from 0 through 255.
+.SH OPTIONS
+.TP
+.BI --start-offset " offset"
+Rewrite matching frames at or after this offset from the first TLOG record. The default is zero.
+.TP
+.BI --end-offset " offset"
+Stop rewriting after this offset. Later records are copied unchanged.
+.TP
+.BI --dialect-file " file"
+Load CRC-extra definitions from a MAVLink dialect XML file instead of the built-in common dialect. Included XML files are resolved relative to the dialect file.
+.TP
+.BR -h , " --help"
+Display usage information and exit.
+.SH EXAMPLES
+Rewrite system ID 1 to 10 throughout a TLOG:
+.PP
+.EX
+maps-mavlink-tlog-system-id original.tlog rewritten.tlog 1 10
+.EE
+.PP
+Rewrite only between 5 and 20 minutes:
+.PP
+.EX
+maps-mavlink-tlog-system-id original.tlog rewritten.tlog 1 10 \
+  --start-offset 05:00 --end-offset 20:00
+.EE
+.SH FILES
+.TP
+.I /opt/maps/apps/mavlink_tools.jar
+MAVLink tools JAR installed by the maps-apps package.
+.SH SEE ALSO
+.BR maps-mavlink-tlog-tail (1),
+.BR maps-mavlink-inspect (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.

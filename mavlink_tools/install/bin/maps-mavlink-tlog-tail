@@ -1,0 +1,3 @@
+#!/bin/sh
+exec java -cp /opt/maps/apps/mavlink_tools.jar \
+  io.mapsmessaging.tools.mavlink.TlogTailExtractor "$@"

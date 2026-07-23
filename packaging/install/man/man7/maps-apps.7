@@ -4,7 +4,7 @@ maps-apps \- operational and diagnostic applications for MapsMessaging
 .SH DESCRIPTION
 The
 .B maps-apps
-Debian package installs a collection of MapsMessaging administration, inspection, capture, conversion, and replay tools. Application JARs are installed below
+Debian package installs a collection of MapsMessaging administration, inspection, capture, conversion, extraction, rewrite, and replay tools. Application JARs are installed below
 .I /opt/maps/apps
 and command launchers are installed in
 .IR /usr/bin .
@@ -26,6 +26,12 @@ Inspect MAVLink frame headers and filter capture contents.
 .TP
 .BR maps-mavlink-replay (1)
 Replay MAVLink TLOG, MUDP, legacy DAT, or raw captures to UDP.
+.TP
+.BR maps-mavlink-tlog-tail (1)
+Extract the final duration from a TLOG without changing packet bytes or timestamps.
+.TP
+.BR maps-mavlink-tlog-system-id (1)
+Rewrite a MAVLink system ID in a TLOG and recalculate frame checksums.
 .TP
 .BR maps-udp-capture (1)
 Capture UDP datagrams to a replayable Maps UDP file.
@@ -64,6 +70,8 @@ Default Maps logger output directory.
 .BR maps-mavlink-convert (1),
 .BR maps-mavlink-inspect (1),
 .BR maps-mavlink-replay (1),
+.BR maps-mavlink-tlog-tail (1),
+.BR maps-mavlink-tlog-system-id (1),
 .BR maps-udp-capture (1),
 .BR maps-udp-replay (1),
 .BR maps-top (1),
