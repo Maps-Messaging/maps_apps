@@ -40,7 +40,7 @@ public class ReplaySourceFactory {
     if (fileName.endsWith(".dat") || fileName.endsWith(".csv")) {
       return ReplayFormat.LEGACY_DAT;
     }
-    if (fileName.endsWith(".raw") || fileName.endsWith(".rlog") || fileName.endsWith(".bin")) {
+    if (fileName.endsWith(".raw") || fileName.endsWith(".bin")) {
       return ReplayFormat.RAW;
     }
     throw new IOException("Unable to detect capture format for " + captureFile + "; use --format");
