@@ -4,12 +4,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TlogReplaySourceTest {
@@ -40,6 +42,16 @@ class TlogReplaySourceTest {
       assertEquals(2_500_000L, secondFrame.delayNanos());
       assertTrue(replaySource.usesSourceTimeline());
       assertNull(replaySource.nextFrame());
+    }
+  }
+
+  @Test
+  void rejectsTruncatedTimestamp() throws Exception {
+    Path capturePath = temporaryDirectory.resolve("truncated.tlog");
+    Files.write(capturePath, new byte[]{0, 1, 2});
+
+    try (TlogReplaySource replaySource = new TlogReplaySource(capturePath)) {
+      assertThrows(EOFException.class, replaySource::nextFrame);
     }
   }
 }
