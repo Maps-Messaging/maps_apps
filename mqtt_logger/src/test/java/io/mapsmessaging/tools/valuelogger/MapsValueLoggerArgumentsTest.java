@@ -41,7 +41,7 @@ class MapsValueLoggerArgumentsTest {
     MapsValueLoggerArguments args = MapsValueLoggerArguments.parse(
         new String[]{"--url", "tcp://localhost:1883"},
         key -> null);
-    assertEquals("/#", args.getTopic());
+    assertEquals("#", args.getTopic());
     assertEquals(1, args.getQos());
     assertEquals(OutputFormat.CSV, args.getOutputFormat());
     assertEquals("/var/log/maps-logger", args.getOutputDir());
