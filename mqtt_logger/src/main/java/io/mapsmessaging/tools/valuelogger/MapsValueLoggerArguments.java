@@ -92,7 +92,7 @@ public class MapsValueLoggerArguments {
 
     if (topic == null) {
       String envTopic = env.apply("MAPS_LOGGER_TOPIC");
-      topic = (envTopic != null) ? envTopic : "/#";
+      topic = (envTopic != null) ? envTopic : "#";
     }
 
     if (qos == null) {
