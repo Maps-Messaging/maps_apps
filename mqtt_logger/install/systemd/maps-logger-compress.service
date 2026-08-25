@@ -3,5 +3,12 @@ Description=Compress old MAPS Logger output files
 
 [Service]
 Type=oneshot
+# "-" prefix: a missing env file (fresh install ordering) must not fail the timer.
+EnvironmentFile=-/etc/maps-logger/env
 ExecStart=/bin/bash -c 'CURRENT="maps-$(date -u +%%Y-%%m-%%d-%%H)"; find /var/log/maps-logger -name "*.csv" -mmin +120 ! -name "*.gz" ! -name "${CURRENT}.csv" -exec gzip -f {} \;'
 ExecStart=/bin/bash -c 'CURRENT="maps-$(date -u +%%Y-%%m-%%d-%%H)"; find /var/log/maps-logger -name "*.ndjson" -mmin +120 ! -name "*.gz" ! -name "${CURRENT}.ndjson" -exec gzip -f {} \;'
+# Retention: prune compressed files older than MAPS_LOGGER_RETENTION_DAYS
+# (0/unset = keep forever — the pre-retention behaviour). bash-level default
+# because an env file preserved from an older package (--force-confold)
+# will not contain the variable.
+ExecStart=/bin/bash -c 'd="$${MAPS_LOGGER_RETENTION_DAYS:-0}"; [ "$d" -gt 0 ] 2>/dev/null && find /var/log/maps-logger -name "*.gz" -mtime +"$d" -delete || true'
