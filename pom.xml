@@ -90,6 +90,7 @@
 
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.organization>maps-messaging</sonar.organization>
+        <sonar.projectKey>Maps-Messaging_maps_apps</sonar.projectKey>
         <sonar.sources>src/main</sonar.sources>
         <sonar.test.exclusions>**/*Test.*,**/*IT.*,**.*JMH.*</sonar.test.exclusions>
 
@@ -350,5 +351,12 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 </project>
