@@ -36,6 +36,12 @@ Load a directory and open the interactive SQL prompt:
 maps-ndjson-viewer /var/log/maps-logger
 ```
 
+When launching from an IDE or another environment without a Java console, request the prompt explicitly:
+
+```bash
+maps-ndjson-viewer /var/log/maps-logger --interactive
+```
+
 Run one query:
 
 ```bash

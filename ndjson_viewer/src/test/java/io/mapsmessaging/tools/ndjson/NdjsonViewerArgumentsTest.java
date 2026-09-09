@@ -41,4 +41,21 @@ class NdjsonViewerArgumentsTest {
         () -> NdjsonViewerArguments.parse(
             new String[] {"log.ndjson", "--topics", "--sql", "SELECT 1"}));
   }
+
+  @Test
+  void enablesInteractiveModeExplicitly() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(new String[] {"log.ndjson", "--interactive"});
+
+    assertTrue(arguments.interactive());
+  }
+
+  @Test
+  void rejectsInteractiveModeWithAnotherOperation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            NdjsonViewerArguments.parse(
+                new String[] {"log.ndjson", "--interactive", "--topics"}));
+  }
 }

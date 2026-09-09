@@ -44,7 +44,7 @@ public final class MapsNdjsonViewerMain {
           execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
         } else if (arguments.sql() != null) {
           execute(database, arguments.sql(), arguments);
-        } else if (System.console() != null) {
+        } else if (arguments.interactive() || System.console() != null) {
           new InteractiveQueryShell(database, new QueryResultPrinter()).run();
         } else {
           execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
@@ -87,6 +87,7 @@ public final class MapsNdjsonViewerMain {
     output.println("Usage: maps-ndjson-viewer <file-or-directory> [options]");
     output.println("  --topics                 list topics and record counts");
     output.println("  --sql <query>            execute SQL against maps_log or mavlink_log");
+    output.println("  --interactive            open the SQL prompt, including inside an IDE");
     output.println("  --database <file>        persist the imported data in a DuckDB database");
     output.println("  --format table|ndjson|csv");
     output.println("  --output <file>          write query results to a file");
