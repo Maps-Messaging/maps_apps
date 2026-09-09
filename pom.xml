@@ -34,6 +34,7 @@
     <modules>
         <module>mqtt_logger</module>
         <module>audit_viewer</module>
+        <module>ndjson_viewer</module>
         <module>udp_helpers</module>
         <module>mavlink_tools</module>
         <module>canbus_replay</module>
@@ -96,6 +97,7 @@
 
         <version.lombok>1.18.42</version.lombok>
         <version.gson>2.13.2</version.gson>
+        <version.duckdb>1.5.5.1</version.duckdb>
         <version.junit>6.0.1</version.junit>
         <version.mockito>5.21.0</version.mockito>
 
@@ -146,6 +148,12 @@
                 <groupId>com.google.code.gson</groupId>
                 <artifactId>gson</artifactId>
                 <version>${version.gson}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.duckdb</groupId>
+                <artifactId>duckdb_jdbc</artifactId>
+                <version>${version.duckdb}</version>
             </dependency>
 
             <dependency>
