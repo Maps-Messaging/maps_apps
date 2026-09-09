@@ -46,7 +46,7 @@ Run one query:
 
 ```bash
 maps-ndjson-viewer telemetry.ndjson \
-  --sql "SELECT receivedTimestamp, topic, payload FROM mavlink_log ORDER BY receivedTimestamp"
+  --sql "SELECT receivedTimestamp, topic, payload FROM maps_log WHERE topic = '/service/status' ORDER BY receivedTimestamp"
 ```
 
 Persist the imported records for use from DBeaver or later analysis:
@@ -59,8 +59,8 @@ Export selected fields:
 
 ```bash
 maps-ndjson-viewer telemetry.ndjson \
-  --sql "SELECT receivedTimestamp, topic, json_extract_string(payload, '$.heading') AS heading FROM mavlink_log WHERE topic LIKE '%GLOBAL_POSITION_INT%' ORDER BY receivedTimestamp" \
-  --output heading.csv
+  --sql "SELECT receivedTimestamp, topic, json_extract_string(payload, '$.body.state') AS state FROM maps_log WHERE topic LIKE '%status%' ORDER BY receivedTimestamp" \
+  --output status.csv
 ```
 
 An output filename ending in `.csv` selects CSV. Other output filenames default to NDJSON. The format can be selected explicitly with `--format table`, `--format ndjson`, or `--format csv`.
@@ -76,15 +76,17 @@ An output filename ending in `.csv` selects CSV. Other output filenames default 
 
 Any other line is executed as DuckDB SQL.
 
-## Useful MAVLink queries
+## Useful queries
 
-Find status text and command acknowledgements:
+Filter a topic over a time interval:
 
 ```sql
 SELECT receivedTimestamp, topic, payload
-FROM mavlink_log
-WHERE topic LIKE '%STATUSTEXT%'
-   OR topic LIKE '%COMMAND_ACK%'
+FROM maps_log
+WHERE topic = '/service/status'
+  AND CAST(receivedTimestamp AS TIMESTAMPTZ)
+      BETWEEN TIMESTAMPTZ '2026-01-01 09:00:00+00'
+          AND TIMESTAMPTZ '2026-01-01 10:00:00+00'
 ORDER BY receivedTimestamp;
 ```
 
@@ -92,8 +94,8 @@ Inspect the decoded payload structure before selecting fields:
 
 ```sql
 SELECT topic, decoded_text
-FROM mavlink_log
+FROM maps_log
 LIMIT 20;
 ```
 
-The precise JSON paths depend on the MAVLink-to-JSON representation present in the log.
+The precise JSON paths depend on the decoded representation present in the log.
