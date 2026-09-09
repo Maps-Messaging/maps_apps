@@ -5,6 +5,7 @@
 package io.mapsmessaging.tools.ndjson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,6 +80,28 @@ class DuckDbLogDatabaseTest {
   }
 
   @Test
+  void executesAttachAndCreateTableStatements() throws Exception {
+    Path input = temporaryDirectory.resolve("maps.ndjson");
+    Path reviewDatabase = temporaryDirectory.resolve("review.duckdb");
+    Files.writeString(input, envelope("mavlink/1/GPS_RAW_INT", "{\"fixType\":3}"));
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
+      database.load(List.of(input));
+      executeStatement(database, "ATTACH '" + reviewDatabase + "' AS review");
+      executeStatement(
+          database,
+          "CREATE TABLE review.maps_log AS SELECT topic, payload FROM maps_log");
+      executeStatement(database, "DETACH review");
+    }
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(reviewDatabase);
+         DuckDbLogDatabase.Query query = database.query("SELECT count(*) FROM maps_log")) {
+      query.resultSet().next();
+      assertEquals(1, query.resultSet().getLong(1));
+    }
+  }
+
+  @Test
   void resolvesAndLoadsPlainAndGzipFilesFromDirectory() throws Exception {
     Path plain = temporaryDirectory.resolve("first.ndjson");
     Path compressed = temporaryDirectory.resolve("nested/second.ndjson.gz");
@@ -104,6 +127,12 @@ class DuckDbLogDatabaseTest {
     try (GZIPOutputStream gzip = new GZIPOutputStream(Files.newOutputStream(path));
          OutputStreamWriter writer = new OutputStreamWriter(gzip, StandardCharsets.UTF_8)) {
       writer.write(value);
+    }
+  }
+
+  private void executeStatement(DuckDbLogDatabase database, String sql) throws Exception {
+    try (DuckDbLogDatabase.Query query = database.query(sql)) {
+      assertFalse(query.hasResultSet());
     }
   }
 }

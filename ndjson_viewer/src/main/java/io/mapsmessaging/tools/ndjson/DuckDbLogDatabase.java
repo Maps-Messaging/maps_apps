@@ -70,14 +70,21 @@ final class DuckDbLogDatabase implements AutoCloseable {
   Query query(String sql) throws SQLException {
     Statement statement = connection.createStatement();
     try {
-      return new Query(statement, statement.executeQuery(sql));
+      boolean hasResultSet = statement.execute(sql);
+      ResultSet resultSet = hasResultSet ? statement.getResultSet() : null;
+      return new Query(statement, resultSet, statement.getLargeUpdateCount());
     } catch (SQLException exception) {
       statement.close();
       throw exception;
     }
   }
 
-  record Query(Statement statement, ResultSet resultSet) implements AutoCloseable {
+  record Query(Statement statement, ResultSet resultSet, long updateCount)
+      implements AutoCloseable {
+
+    boolean hasResultSet() {
+      return resultSet != null;
+    }
 
     @Override
     public void close() throws SQLException {

@@ -52,7 +52,11 @@ final class InteractiveQueryShell {
 
   private void execute(String sql, PrintWriter output) throws SQLException {
     try (DuckDbLogDatabase.Query query = database.query(sql)) {
-      printer.print(query.resultSet(), QueryOutputFormat.TABLE, output);
+      if (query.hasResultSet()) {
+        printer.print(query.resultSet(), QueryOutputFormat.TABLE, output);
+      } else {
+        output.println("Statement completed.");
+      }
     }
   }
 

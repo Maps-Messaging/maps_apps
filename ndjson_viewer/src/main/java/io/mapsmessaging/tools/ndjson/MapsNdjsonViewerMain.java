@@ -63,7 +63,11 @@ public final class MapsNdjsonViewerMain {
       NdjsonViewerArguments arguments) throws Exception {
     try (PrintWriter output = createOutput(arguments);
          DuckDbLogDatabase.Query query = database.query(sql)) {
-      new QueryResultPrinter().print(query.resultSet(), arguments.format(), output);
+      if (query.hasResultSet()) {
+        new QueryResultPrinter().print(query.resultSet(), arguments.format(), output);
+      } else {
+        output.println("Statement completed.");
+      }
     }
   }
 
