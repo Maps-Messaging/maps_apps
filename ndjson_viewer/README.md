@@ -27,7 +27,7 @@ Invalid Base64 or non-JSON payloads do not abort loading. `decoded_text` or `pay
 List all topics:
 
 ```bash
-maps-ndjson-viewer stickleback.ndjson --topics
+maps-ndjson-viewer telemetry.ndjson --topics
 ```
 
 Load a directory and open the interactive SQL prompt:
@@ -45,20 +45,20 @@ maps-ndjson-viewer /var/log/maps-logger --interactive
 Run one query:
 
 ```bash
-maps-ndjson-viewer stickleback.ndjson \
+maps-ndjson-viewer telemetry.ndjson \
   --sql "SELECT receivedTimestamp, topic, payload FROM mavlink_log ORDER BY receivedTimestamp"
 ```
 
 Persist the imported records for use from DBeaver or later analysis:
 
 ```bash
-maps-ndjson-viewer stickleback.ndjson --database stickleback.duckdb --topics
+maps-ndjson-viewer telemetry.ndjson --database telemetry.duckdb --topics
 ```
 
 Export selected fields:
 
 ```bash
-maps-ndjson-viewer stickleback.ndjson \
+maps-ndjson-viewer telemetry.ndjson \
   --sql "SELECT receivedTimestamp, topic, json_extract_string(payload, '$.heading') AS heading FROM mavlink_log WHERE topic LIKE '%GLOBAL_POSITION_INT%' ORDER BY receivedTimestamp" \
   --output heading.csv
 ```
