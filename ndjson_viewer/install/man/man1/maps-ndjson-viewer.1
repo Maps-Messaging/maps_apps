@@ -1,0 +1,53 @@
+.TH MAPS-NDJSON-VIEWER 1 "9 September 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-ndjson-viewer \- query decoded MAPS NDJSON message logs
+.SH SYNOPSIS
+.B maps-ndjson-viewer
+.I file-or-directory
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-ndjson-viewer
+loads MAPS message-log NDJSON through embedded DuckDB, decodes Base64 opaqueData,
+and exposes decoded JSON for SQL analysis. Directories are searched recursively.
+.PP
+The relations maps_log and mavlink_log are available to queries. No external database
+server or DuckDB installation is required.
+.SH OPTIONS
+.TP
+.B --topics
+List topics and record counts.
+.TP
+.BI --sql " query"
+Execute DuckDB SQL against maps_log or mavlink_log.
+.TP
+.B --interactive
+Open the interactive SQL prompt, including when launched from an IDE.
+.TP
+.BI --database " file"
+Persist the imported records in a DuckDB database file.
+.TP
+.BI --format " table|ndjson|csv"
+Select the result format.
+.TP
+.BI --output " file"
+Write results to a file. A .csv suffix selects CSV; other suffixes select NDJSON unless
+--format is specified.
+.SH INTERACTIVE COMMANDS
+.TP
+.B .topics
+List all topics.
+.TP
+.B .mavlink-topics
+List MAVLink topics.
+.TP
+.B .schema
+Describe maps_log.
+.TP
+.B .quit
+Exit the interactive shell.
+.SH FILES
+.TP
+.I /opt/maps/apps/ndjson_viewer.jar
+Executable JAR installed by the maps-apps Debian package.
+.SH AUTHOR
+MapsMessaging B.V.
