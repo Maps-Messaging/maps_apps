@@ -27,6 +27,18 @@ Adjust the classpath to the installation layout. The installed dynamic_storage t
 
 `--decode` validates message decoding without writing an event file. Without `--decode` or `--output`, checks are structural and require only dynamic_storage, not the server.
 
+## Parallel inspection
+
+Use `--threads N` (default **4**, range 1–256) to inspect resources and partitions concurrently. For example:
+
+```bash
+storage_inspector/bin/maps-storage-inspector --input /srv/maps-snapshot --threads 8 --report /tmp/storage-report.ndjson
+```
+
+Directory traversal submits work to a fixed worker pool with at most `2 × N` outstanding tasks. Each partition has its own reader and decoder. Output locks preserve complete NDJSON lines; records from different partitions may interleave and global ordering is not guaranteed. The final summary waits for all workers. `--threads 1` provides serial inspection.
+
+Memory and temporary archive space scale with active workers: the record and expanded-archive limits are per task. Raise concurrency to suit the storage device and available heap/disk space; the launcher retains its 512 MiB heap limit. Output remains serial, so throughput can also be limited by JSON serialization and writing.
+
 ## What it reports
 
 - Recursive discovery of `partition_<number>_index` and matching `_index_data` files, grouped by store directory in the final count.

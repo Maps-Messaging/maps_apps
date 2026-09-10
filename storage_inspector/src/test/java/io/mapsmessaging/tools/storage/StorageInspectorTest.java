@@ -19,4 +19,8 @@ class StorageInspectorTest {
   void loadResourceMetadataAndCompressedPartitionsWithoutChangingInputs() throws Exception {
     ResourceLoadingChecks.main(new String[0]);
   }
+  @Test
+  void boundConcurrentInspectionsAndPropagateFailures() throws Exception {
+    InspectionPoolChecks.main(new String[0]);
+  }
 }
