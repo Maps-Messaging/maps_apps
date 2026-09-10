@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+app_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+app_jar="${MAPS_STORAGE_INSPECTOR_JAR:-${app_dir}/target/storage_inspector-1.0.0-SNAPSHOT.jar}"
+if [[ ! -f "$app_jar" ]]; then
+  echo "Inspector JAR missing: $app_jar. Build with mvn -pl storage_inspector -am package." >&2
+  exit 2
+fi
+classpath="$app_jar:${app_dir}/target/lib/*"
+# Put the installed storage library before the build's copy to match the server version.
+if [[ -n "${MAPS_SERVER_CLASSPATH:-}" ]]; then
+  classpath="$app_jar:$MAPS_SERVER_CLASSPATH:${app_dir}/target/lib/*"
+fi
+java_bin="java"
+if [[ -n "${JAVA_HOME:-}" ]]; then java_bin="$JAVA_HOME/bin/java"; fi
+exec "$java_bin" -Xmx512m -cp "$classpath" io.mapsmessaging.tools.storage.StorageInspectorMain "$@"

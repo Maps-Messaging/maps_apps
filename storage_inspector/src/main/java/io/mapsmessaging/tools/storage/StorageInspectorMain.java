@@ -1,0 +1,196 @@
+/* Copyright [ 2024 - 2026 ] MapsMessaging B.V.
+ * Licensed under the Apache License, Version 2.0 with the Commons Clause. */
+package io.mapsmessaging.tools.storage;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashSet;
+import java.util.Set;
+
+public final class StorageInspectorMain {
+  private static final Gson JSON = new GsonBuilder().serializeNulls().disableHtmlEscaping().create();
+  private static final String USAGE = """
+      MAPS storage inspector (Java 21)
+      Usage: StorageInspectorMain --input DIRECTORY [--output events.ndjson]
+             [--report findings.ndjson] [--decode] [--topic TOPIC]
+             [--max-record-bytes BYTES]
+      Recursively inspects partition_*_index and their _data files using read-only access.
+      --output requires the MAPS server and its dependencies on the Java classpath.
+      --decode validates messages without requiring an export file.
+      --topic supplies the topic for a single store directory; otherwise topic is null.
+      Outputs must be new files outside the input tree. Reports go to stderr by default.
+      Default record limit: 67108864 bytes. No repair or automatic archive restoration.
+      Exit: 0 checked, 1 corruption/read failure, 2 usage/runtime error, 3 warnings/incomplete.
+      """;
+
+  private StorageInspectorMain() {}
+
+  public static void main(String[] args) {
+    System.exit(run(args, System.err));
+  }
+
+  static int run(String[] args, PrintStream err) {
+    try {
+      Options options = Options.parse(args);
+      if (options.help) {
+        err.print(USAGE);
+        return 0;
+      }
+      MessageDecoder decoder = options.decode ? new MessageDecoder() : null;
+      Path root = options.input.toRealPath();
+      if (!Files.isDirectory(root)) throw new IllegalArgumentException("--input must be a directory");
+      Path output = outputPath(options.output, root);
+      Path report = outputPath(options.report, root);
+      if (output != null && output.equals(report)) throw new IllegalArgumentException("--output and --report must differ");
+      try (BufferedWriter eventWriter = writer(output); BufferedWriter reportWriter = writer(report)) {
+        ReadOnlyStore.Sink sink = new ReadOnlyStore.Sink() {
+          @Override public void report(JsonObject record) throws IOException {
+            try {
+            if (reportWriter == null) {
+              err.println(JSON.toJson(record));
+              if (err.checkError()) throw new IOException("Cannot write report to stderr");
+            } else write(reportWriter, record);
+            } catch (IOException e) { throw new ReadOnlyStore.OutputFailure(e); }
+          }
+          @Override public void event(JsonObject event) throws IOException {
+            try {
+              if (eventWriter != null) write(eventWriter, event);
+            } catch (IOException e) { throw new ReadOnlyStore.OutputFailure(e); }
+          }
+        };
+        return scan(root, options, decoder, sink);
+      }
+    } catch (ReflectiveOperationException | LinkageError e) {
+      err.println("Cannot load MAPS decoder. Add the matching server JAR and dependency directory to -cp: " + e);
+      return 2;
+    } catch (IOException | IllegalArgumentException e) {
+      err.println("Storage inspection failed: " + e.getMessage());
+      return 2;
+    }
+  }
+
+  private static int scan(Path root, Options options, MessageDecoder decoder, ReadOnlyStore.Sink sink) throws IOException {
+    ReadOnlyStore reader = new ReadOnlyStore(options.maxRecordBytes, decoder, sink);
+    long[] totals = new long[5]; // partitions, errors, warnings, active, decoded
+    Set<Path> directories = new HashSet<>();
+    Files.walkFileTree(root, new SimpleFileVisitor<>() {
+      @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        String name = file.getFileName().toString();
+        if (name.matches("partition_[0-9]+_index")) {
+          if (options.topic != null && !file.getParent().equals(root)) {
+            throw new IllegalArgumentException("--topic requires a single store directory without nested stores");
+          }
+          directories.add(file.getParent());
+          ReadOnlyStore.Stats result = reader.inspect(file, options.topic);
+          totals[0]++;
+          totals[1] += result.errors;
+          totals[2] += result.warnings;
+          totals[3] += result.active;
+          totals[4] += result.decoded;
+        } else if (name.matches("partition_[0-9]+_index_data")) {
+          Path index = file.resolveSibling(name.substring(0, name.length() - 5));
+          if (!Files.exists(index, LinkOption.NOFOLLOW_LINKS)) {
+            issue(file, "ERROR", "ORPHAN_DATA", "Data file has no index; events cannot be classified as active", sink);
+            totals[1]++;
+          }
+        } else if (name.startsWith("partition_")) {
+          issue(file, "WARNING", "UNINSPECTED_FILE", "Archive, temporary or unsupported partition file", sink);
+          totals[2]++;
+        }
+        return FileVisitResult.CONTINUE;
+      }
+      @Override public FileVisitResult visitFileFailed(Path file, IOException exception) throws IOException {
+        issue(file, "ERROR", "DISCOVERY_FAILED", exception.toString(), sink);
+        totals[1]++;
+        return FileVisitResult.CONTINUE;
+      }
+    });
+    if (totals[0] == 0) {
+      issue(root, "WARNING", "NO_STORES", "No supported partition indexes discovered", sink);
+      totals[2]++;
+    }
+    JsonObject summary = ReadOnlyStore.base(root, "summary");
+    summary.addProperty("stores", directories.size());
+    summary.addProperty("partitions", totals[0]);
+    summary.addProperty("errors", totals[1]);
+    summary.addProperty("warnings", totals[2]);
+    summary.addProperty("activeEvents", totals[3]);
+    summary.addProperty("decodedEvents", totals[4]);
+    sink.report(summary);
+    return totals[1] > 0 ? 1 : totals[2] > 0 ? 3 : 0;
+  }
+
+  private static void issue(Path file, String severity, String code, String detail, ReadOnlyStore.Sink sink) throws IOException {
+    JsonObject issue = ReadOnlyStore.base(file, "finding");
+    issue.addProperty("severity", severity);
+    issue.addProperty("code", code);
+    issue.addProperty("detail", detail);
+    sink.report(issue);
+  }
+
+  private static Path outputPath(Path value, Path root) throws IOException {
+    if (value == null) return null;
+    Path absolute = value.toAbsolutePath().normalize();
+    Path resolved = absolute.getParent().toRealPath().resolve(absolute.getFileName());
+    if (resolved.startsWith(root)) throw new IllegalArgumentException("Output must be outside the input tree: " + resolved);
+    if (Files.exists(resolved, LinkOption.NOFOLLOW_LINKS)) throw new IllegalArgumentException("Refusing to overwrite " + resolved);
+    return resolved;
+  }
+
+  private static BufferedWriter writer(Path path) throws IOException {
+    return path == null ? null : Files.newBufferedWriter(path, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+  }
+
+  private static void write(BufferedWriter writer, JsonObject record) throws IOException {
+    writer.write(JSON.toJson(record));
+    writer.newLine();
+  }
+
+  private static final class Options {
+    Path input;
+    Path output;
+    Path report;
+    boolean decode;
+    boolean help;
+    String topic;
+    long maxRecordBytes = 64L * 1024 * 1024;
+
+    static Options parse(String[] args) {
+      Options options = new Options();
+      Set<String> seen = new HashSet<>();
+      for (int i = 0; i < args.length; i++) {
+        String arg = args[i];
+        if (!seen.add(arg)) throw new IllegalArgumentException("Repeated option: " + arg);
+        if (arg.equals("--help") || arg.equals("-h")) { options.help = true; continue; }
+        if (arg.equals("--decode")) { options.decode = true; continue; }
+        if (++i >= args.length) throw new IllegalArgumentException("Missing value for " + arg);
+        String value = args[i];
+        switch (arg) {
+          case "--input" -> options.input = Path.of(value);
+          case "--output" -> { options.output = Path.of(value); options.decode = true; }
+          case "--report" -> options.report = Path.of(value);
+          case "--topic" -> options.topic = value;
+          case "--max-record-bytes" -> options.maxRecordBytes = Long.parseLong(value);
+          default -> throw new IllegalArgumentException("Unknown option: " + arg);
+        }
+      }
+      if (!options.help && options.input == null) throw new IllegalArgumentException("--input is required; use --help");
+      if (options.maxRecordBytes < 12 || options.maxRecordBytes > Integer.MAX_VALUE) {
+        throw new IllegalArgumentException("--max-record-bytes must be between 12 and 2147483647");
+      }
+      return options;
+    }
+  }
+}
