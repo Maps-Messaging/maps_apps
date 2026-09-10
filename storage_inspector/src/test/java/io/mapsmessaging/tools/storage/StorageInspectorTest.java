@@ -14,4 +14,9 @@ class StorageInspectorTest {
   void preserveJsonAndBinaryPayloadsAndMessageMetadata() throws Exception {
     MessageExportChecks.main(new String[0]);
   }
+
+  @Test
+  void loadResourceMetadataAndCompressedPartitionsWithoutChangingInputs() throws Exception {
+    ResourceLoadingChecks.main(new String[0]);
+  }
 }

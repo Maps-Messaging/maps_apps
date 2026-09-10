@@ -21,6 +21,8 @@ final class ReadOnlyStore {
   static final int INDEX_HEADER = 48;
   static final int DATA_HEADER = 24;
   private final long maxRecordBytes;
+  private final long maxArchiveBytes;
+  private final Path inputRoot;
   private final MessageDecoder decoder;
   private final Sink sink;
 
@@ -30,7 +32,13 @@ final class ReadOnlyStore {
   }
 
   ReadOnlyStore(long maxRecordBytes, MessageDecoder decoder, Sink sink) {
+    this(maxRecordBytes, 1024L * 1024 * 1024, null, decoder, sink);
+  }
+
+  ReadOnlyStore(long maxRecordBytes, long maxArchiveBytes, Path inputRoot, MessageDecoder decoder, Sink sink) {
     this.maxRecordBytes = maxRecordBytes;
+    this.maxArchiveBytes = maxArchiveBytes;
+    this.inputRoot = inputRoot;
     this.decoder = decoder;
     this.sink = sink;
   }
@@ -50,17 +58,17 @@ final class ReadOnlyStore {
     String dataState = "UNKNOWN";
     long start;
     long end;
+    StoreMetadata metadata;
   }
 
   Stats inspect(Path index, String topic) throws IOException {
     Stats stats = new Stats();
     Path data = index.resolveSibling(index.getFileName() + "_data");
-    if (topic == null) {
-      try {
-        topic = StoreMetadata.topic(index.getParent());
-      } catch (IOException e) {
-        finding(stats, index, "WARNING", "METADATA_UNREADABLE", -1, e.toString());
-      }
+    try {
+      stats.metadata = StoreMetadata.load(index.getParent());
+      if (topic == null && stats.metadata != null) topic = stats.metadata.topic();
+    } catch (IOException e) {
+      finding(stats, index, "WARNING", "METADATA_UNREADABLE", -1, e.toString());
     }
     try {
       inspectFiles(index, data, topic, stats);
@@ -70,6 +78,7 @@ final class ReadOnlyStore {
       finding(stats, index, "ERROR", "STORE_UNREADABLE", -1, e.toString());
     }
     JsonObject summary = base(index, "store");
+    if (stats.metadata != null) summary.add("resource", stats.metadata.json());
     summary.addProperty("indexState", stats.indexState);
     summary.addProperty("dataState", stats.dataState);
     summary.addProperty("validation", decoder == null ? "STRUCTURAL_ONLY" : "STRUCTURAL_AND_MESSAGE");
@@ -117,6 +126,7 @@ final class ReadOnlyStore {
       }
       if (!Files.exists(data, LinkOption.NOFOLLOW_LINKS)) {
         finding(stats, data, "ERROR", "MISSING_DATA", -1, "Index has no data file");
+        scanIndex(idx, null, index, topic, Math.min(slots, available), stats);
         return;
       }
       BasicFileAttributes beforeData = attributes(data);
@@ -124,9 +134,7 @@ final class ReadOnlyStore {
       try (FileChannel dat = open(data)) {
         if (dat.size() > 0 && read(dat, 0, 1).get() == '#') {
           stats.dataState = "ARCHIVED";
-          finding(stats, data, "WARNING", "ARCHIVE_NOT_INSPECTED", 0,
-              "Deferred/compressed/migrated/S3 placeholder: restore an offline copy with matching storage tooling before inspection");
-          scanIndex(idx, null, index, topic, Math.min(slots, available), stats);
+          inspectArchive(idx, index, data, topic, Math.min(slots, available), stats);
         } else {
           stats.dataState = header(dat, data, stats);
           scanIndex(idx, dat, index, topic, Math.min(slots, available), stats);
@@ -136,6 +144,33 @@ final class ReadOnlyStore {
       changed(data, beforeData, stats);
     }
     changed(index, beforeIndex, stats);
+  }
+
+  private void inspectArchive(FileChannel indexChannel, Path index, Path data, String topic, long slots, Stats stats) throws IOException {
+    LocalArchive opened;
+    try {
+      opened = LocalArchive.open(data, maxArchiveBytes, inputRoot == null ? index.getParent().toRealPath() : inputRoot);
+    } catch (LocalArchive.Unavailable e) {
+      finding(stats, data, "WARNING", "ARCHIVE_NOT_INSPECTED", 0, e.getMessage());
+      scanIndex(indexChannel, null, index, topic, slots, stats);
+      return;
+    } catch (IOException e) {
+      finding(stats, data, "ERROR", "INVALID_ARCHIVE", 0, e.getMessage());
+      scanIndex(indexChannel, null, index, topic, slots, stats);
+      return;
+    }
+    try (LocalArchive archive = opened) {
+      stats.bytes += attributes(archive.sidecar).size();
+      String state = header(archive.channel, data, stats);
+      stats.dataState = "COMPRESSED_" + state;
+      JsonObject archived = base(data, "archive");
+      archived.addProperty("archiveFile", archive.sidecar.toString());
+      archived.addProperty("uncompressedBytes", archive.channel.size());
+      archived.addProperty("digestVerified", archive.digestVerified);
+      sink.report(archived);
+      scanIndex(indexChannel, archive.channel, index, topic, slots, stats);
+      scanData(archive.channel, data, stats);
+    }
   }
 
   private void scanIndex(FileChannel idx, FileChannel data, Path index, String topic, long slots, Stats stats) throws IOException {
@@ -175,6 +210,7 @@ final class ReadOnlyStore {
         continue;
       }
       if (event != null) {
+        if (stats.metadata != null) event.add("storageResource", stats.metadata.json());
         event.addProperty("topic", topic);
         event.addProperty("storageFile", index.toString());
         event.addProperty("storageKey", record.getKey());

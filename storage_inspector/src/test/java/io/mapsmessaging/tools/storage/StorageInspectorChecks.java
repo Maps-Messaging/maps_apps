@@ -74,7 +74,7 @@ public final class StorageInspectorChecks {
     check(stats.errors == 0 && stats.warnings == 1 && stats.indexState.equals("OPEN"), "open state is a warning");
 
     Path archived = fixture(root.resolve("archived"));
-    Files.writeString(Path.of(archived + "_data"), "# Zip file place holder\n");
+    Files.writeString(Path.of(archived + "_data"), "# s3 bucket place holder\n");
     stats = reader.inspect(archived, null);
     check(stats.warnings == 1 && stats.active == 1 && stats.valid == 0, "archive is not falsely checked");
 
