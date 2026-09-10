@@ -11,19 +11,42 @@ mvn -pl storage_inspector -am clean package
 storage_inspector/bin/maps-storage-inspector --input /srv/maps-snapshot --report /tmp/storage-report.ndjson
 ```
 
-The launcher uses the shaded application JAR and `target/lib/dynamic_storage-*.jar`. It limits the JVM heap to 512 MiB. Keep these files together with the launcher, or set `MAPS_STORAGE_INSPECTOR_JAR` and use the installed server libraries below.
+The Maven runtime dependency `io.mapsmessaging:maps` defaults to `4.5.0-SNAPSHOT` and brings the server decoder and its transitive dependencies into IntelliJ's runtime classpath. Reload the Maven project, select the `storage_inspector` module classpath in the run configuration, and run `StorageInspectorMain` with `--decode` or `--output`. No environment variable is needed in IntelliJ.
 
-To validate and export messages, supply the matching **server JAR and its dependency JARs**. This uses the real `MessageFactory.unpack(ByteBuffer[])`; it does not start MAPS:
+The launcher uses the inspector JAR and the runtime JARs in `target/lib/*`. Keep these together with the launcher. The server and its dependencies are not shaded into the inspector, so an alternate decoder can take precedence. The launcher limits the heap to 512 MiB.
+
+```bash
+storage_inspector/bin/maps-storage-inspector \
+  --input /srv/maps-snapshot \
+  --decode \
+  --report /tmp/storage-report.ndjson
+```
+
+To export messages as well, replace `--decode` with `--output /tmp/storage-events.ndjson`. Decoding uses the real `MessageFactory.unpack(ByteBuffer[])`; it does not start MAPS.
+
+### Alternate server versions
+
+Select the published Maven version matching the server that wrote the data:
+
+```bash
+mvn -pl storage_inspector -am clean package -Dversion.mapsServer=YOUR_SERVER_VERSION
+```
+
+Replace `YOUR_SERVER_VERSION` with an available Maven version, not a Debian package version. Snapshot versions are mutable: use the exact timestamped Maven snapshot when available, or the original installation JARs for exact build matching. Maven must have access to the repositories containing that version and its dependencies.
+
+For IntelliJ, set `version.mapsServer` in its Maven import settings (or change the property in this module's POM), then reload Maven. Passing this as an application argument or JVM property does not change the resolved dependency. The inspector directly selects dynamic_storage `2.5.2`; if the alternate server requires another compatible storage library, also set `-Dversion.dynamicStorage=YOUR_STORAGE_VERSION` and use the same property during IntelliJ import. Confirm the resolved versions with `mvn -pl storage_inspector dependency:tree`.
+
+Alternatively, the shell launcher can load JARs from an existing installation:
 
 ```bash
 export MAPS_SERVER_CLASSPATH='/opt/maps/lib/*:/opt/maps/maps.jar'
 storage_inspector/bin/maps-storage-inspector \
   --input /srv/maps-snapshot \
-  --output /tmp/storage-events.ndjson \
+  --decode \
   --report /tmp/storage-report.ndjson
 ```
 
-Adjust the classpath to the installation layout. The installed dynamic_storage takes precedence over the bundled build copy. Use the same server version/configuration that wrote the data, particularly for compressed message payloads. An executable JAR with nested dependencies must be unpacked to ordinary classpath JARs first.
+Adjust paths to that installation. Its server and dependency JARs precede `target/lib/*`; supply the complete matching dependency set to avoid mixing versions. This variable is read by the shell launcher, not by IntelliJ. Use the same server version/configuration that wrote the data, particularly for compressed payloads. Executable JARs with nested dependencies must first be unpacked into ordinary classpath JARs. Always use `clean package` when changing Maven versions so stale JARs do not remain in `target/lib`.
 
 `--decode` validates message decoding without writing an event file. Without `--decode` or `--output`, checks are structural and require only dynamic_storage, not the server.
 
