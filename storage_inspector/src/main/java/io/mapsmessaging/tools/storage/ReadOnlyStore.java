@@ -25,6 +25,7 @@ final class ReadOnlyStore {
   private final Path inputRoot;
   private final MessageDecoder decoder;
   private final Sink sink;
+  private final EventRange range;
 
   interface Sink {
     void report(JsonObject report) throws IOException;
@@ -36,6 +37,11 @@ final class ReadOnlyStore {
   }
 
   ReadOnlyStore(long maxRecordBytes, long maxArchiveBytes, Path inputRoot, MessageDecoder decoder, Sink sink) {
+    this(maxRecordBytes, maxArchiveBytes, inputRoot, decoder, sink, EventRange.ALL);
+  }
+
+  ReadOnlyStore(long maxRecordBytes, long maxArchiveBytes, Path inputRoot, MessageDecoder decoder, Sink sink, EventRange range) {
+    this.range = range;
     this.maxRecordBytes = maxRecordBytes;
     this.maxArchiveBytes = maxArchiveBytes;
     this.inputRoot = inputRoot;
@@ -44,6 +50,7 @@ final class ReadOnlyStore {
   }
 
   static final class Stats {
+    boolean skipped;
     long active;
     long expired;
     long deleted;
@@ -63,6 +70,10 @@ final class ReadOnlyStore {
 
   Stats inspect(Path index, String topic) throws IOException {
     Stats stats = new Stats();
+    if (range.filtered() && outsideRange(index)) {
+      stats.skipped = true;
+      return stats;
+    }
     Path data = index.resolveSibling(index.getFileName() + "_data");
     try {
       stats.metadata = StoreMetadata.load(index.getParent());
@@ -84,6 +95,11 @@ final class ReadOnlyStore {
     summary.addProperty("validation", decoder == null ? "STRUCTURAL_ONLY" : "STRUCTURAL_AND_MESSAGE");
     summary.addProperty("status", stats.errors > 0 ? "ERROR" : stats.warnings > 0 ? "WARNING" : "CHECKED");
     summary.addProperty("topic", topic);
+    summary.addProperty("scope", range.filtered() ? "SELECTED_EVENT_IDS" : "WHOLE_PARTITION");
+    if (range.filtered()) {
+      summary.addProperty("startEventId", range.start());
+      summary.addProperty("endEventId", range.end());
+    }
     summary.addProperty("startKey", stats.start);
     summary.addProperty("endKey", stats.end);
     summary.addProperty("sizeBytes", stats.bytes);
@@ -98,6 +114,21 @@ final class ReadOnlyStore {
     summary.addProperty("warnings", stats.warnings);
     sink.report(summary);
     return stats;
+  }
+
+  private boolean outsideRange(Path index) {
+    try (FileChannel channel = open(index)) {
+      ByteBuffer header = read(channel, 0, INDEX_HEADER);
+      header.getLong();
+      if (header.getLong() != MAGIC || header.getDouble() != 1.0) return false;
+      long capacity = header.getLong();
+      long first = header.getLong();
+      long last = header.getLong();
+      // Invalid bounds cannot safely establish that this partition is outside the selection.
+      return capacity > 0 && first >= 0 && last >= first && last - first < capacity && !range.overlaps(first, last);
+    } catch (IOException | RuntimeException e) {
+      return false; // Normal inspection reports unreadable headers instead of silently skipping them.
+    }
   }
 
   static final class OutputFailure extends IOException {
@@ -118,10 +149,10 @@ final class ReadOnlyStore {
       }
       long slots = stats.end - stats.start + 1;
       long available = (idx.size() - INDEX_HEADER) / IndexRecord.HEADER_SIZE;
-      if (slots > available) {
+      if (range.lastSlot(stats.start, slots) >= available && range.firstSlot(stats.start) < slots) {
         finding(stats, index, "ERROR", "TRUNCATED_INDEX", idx.size(), "Expected " + slots + " slots; only " + available + " complete slots");
       }
-      if ((idx.size() - INDEX_HEADER) % IndexRecord.HEADER_SIZE != 0) {
+      if ((idx.size() - INDEX_HEADER) % IndexRecord.HEADER_SIZE != 0 && (!range.filtered() || (available >= range.firstSlot(stats.start) && available <= range.lastSlot(stats.start, slots)))) {
         finding(stats, index, "ERROR", "PARTIAL_INDEX_SLOT", idx.size(), "Trailing partial index slot");
       }
       if (!Files.exists(data, LinkOption.NOFOLLOW_LINKS)) {
@@ -138,7 +169,7 @@ final class ReadOnlyStore {
         } else {
           stats.dataState = header(dat, data, stats);
           scanIndex(idx, dat, index, topic, Math.min(slots, available), stats);
-          scanData(dat, data, stats);
+          if (!range.filtered()) scanData(dat, data, stats);
         }
       }
       changed(data, beforeData, stats);
@@ -169,13 +200,14 @@ final class ReadOnlyStore {
       archived.addProperty("digestVerified", archive.digestVerified);
       sink.report(archived);
       scanIndex(indexChannel, archive.channel, index, topic, slots, stats);
-      scanData(archive.channel, data, stats);
+      if (!range.filtered()) scanData(archive.channel, data, stats);
     }
   }
 
   private void scanIndex(FileChannel idx, FileChannel data, Path index, String topic, long slots, Stats stats) throws IOException {
     long now = System.currentTimeMillis();
-    for (long slot = 0; slot < slots; slot++) {
+    long lastSlot = range.lastSlot(stats.start, slots);
+    for (long slot = range.firstSlot(stats.start); slot <= lastSlot; slot++) {
       long offset = INDEX_HEADER + slot * IndexRecord.HEADER_SIZE;
       IndexRecord record = new IndexRecord(stats.start + slot, read(idx, offset, IndexRecord.HEADER_SIZE));
       if (record.getPosition() == 0) {

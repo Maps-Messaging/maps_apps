@@ -23,4 +23,8 @@ class StorageInspectorTest {
   void boundConcurrentInspectionsAndPropagateFailures() throws Exception {
     InspectionPoolChecks.main(new String[0]);
   }
+  @Test
+  void filterDestinationsAndInclusiveEventIds() throws Exception {
+    SelectionChecks.main(new String[0]);
+  }
 }

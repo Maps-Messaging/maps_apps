@@ -50,6 +50,27 @@ Adjust paths to that installation. Its server and dependency JARs precede `targe
 
 `--decode` validates message decoding without writing an event file. Without `--decode` or `--output`, checks are structural and require only dynamic_storage, not the server.
 
+## Select a destination and event IDs
+
+All filters are optional and combine:
+
+```bash
+storage_inspector/bin/maps-storage-inspector \
+  --input /srv/maps-snapshot \
+  --destination /mavlink/1/status \
+  --start-event-id 12000 --end-event-id 12100 \
+  --output /tmp/selected-events.ndjson \
+  --report /tmp/selected-report.ndjson
+```
+
+`--destination` matches the `resourceName` in `resource.yaml` exactly, including case and leading slash. It is a filter, whereas `--topic` only overrides the exported topic name. If metadata is missing, select the physical store with `--input` and omit `--destination`. Unreadable metadata is counted in one selection-incomplete warning; it is not guessed to match.
+
+`--start-event-id` and `--end-event-id` are inclusive non-negative signed-long IDs (the index key, checked against the decoded message identifier). Supply either bound alone for an open-ended range; set both to the same value for one event. IDs are local to a destination: omitting `--destination` applies the ID range independently to every discovered store.
+
+With ID filtering, disjoint partitions are skipped and only selected index slots and their referenced records are read/decoded. Per-partition counts cover selected slots; file size and partition key bounds still describe the file. Reports are marked `SELECTED_EVENT_IDS`. The whole physical-data scan, unrelated resource details and unrelated partition sidecar warnings are suppressed, so a partial scan is not a clean bill of health for the entire store. Deleted/unused slots are counted, but no deleted event is invented or exported.
+
+Shared file-header failures are still reported when the partition cannot safely be classified. Selected compressed partitions require whole-archive expansion and integrity checks before seeking to the selected events. No matching destination/partition produces a concise warning and exit code 3. Use `--decode` instead of `--output` to validate selected messages without dumping them; omit both for structural checks only.
+
 ## Parallel inspection
 
 Use `--threads N` (default **4**, range 1–256) to inspect resources and partitions concurrently. For example:
