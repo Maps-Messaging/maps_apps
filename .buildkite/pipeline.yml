@@ -2,7 +2,7 @@ steps:
   - label: ":java: Build maps_apps"
     key: "build"
     checkout:
-      ssh_secret: "MAPS_GITHUB_SSH_KEY"
+      ssh_secret: "GITHUB_SSH_KEY"
     command:
       - "export SONAR_TOKEN=$(buildkite-agent secret get SONAR_TOKEN)"
       - "mvn --batch-mode clean verify"
