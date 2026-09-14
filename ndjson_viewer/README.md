@@ -55,6 +55,16 @@ Persist the imported records for use from DBeaver or later analysis:
 maps-ndjson-viewer telemetry.ndjson --database telemetry.duckdb --topics
 ```
 
+Open an existing DuckDB database without reloading the original log files by omitting the input path:
+
+```bash
+maps-ndjson-viewer \
+  --database telemetry.duckdb \
+  --sql "SELECT receivedTimestamp, topic, payload FROM maps_log ORDER BY receivedTimestamp"
+```
+
+When no input path is supplied, the database file must already exist. The viewer opens it directly and does not call the log import path, so existing `raw_log`, `maps_log`, and other stored tables are left untouched.
+
 Export selected fields:
 
 ```bash
@@ -65,10 +75,11 @@ maps-ndjson-viewer telemetry.ndjson \
 
 Export a single selected column without a result envelope with `--raw` or `--format raw`. Raw mode requires exactly one selected column. JSON values are written as JSON rather than quoted strings.
 
-For example, extract all recorded STANAG task requests as replayable JSONL payloads:
+For example, extract all recorded STANAG task requests as replayable JSONL payloads from an existing database:
 
 ```bash
-maps-ndjson-viewer /Volumes/workVault/sesimbra-2/maps-logger \
+maps-ndjson-viewer \
+  --database /Volumes/workVault/sesimbra-2/maps-logger.duckdb \
   --sql "SELECT payload FROM maps_log WHERE topic LIKE '%/MessageTypeEnum_TASK_ADMIN' ORDER BY receivedTimestamp" \
   --raw \
   --output tasking.jsonl

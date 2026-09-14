@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 public final class MapsNdjsonViewerMain {
@@ -35,25 +36,41 @@ public final class MapsNdjsonViewerMain {
     }
 
     try {
-      List<java.nio.file.Path> inputFiles = new InputFileResolver().resolve(arguments.input());
-      try (DuckDbLogDatabase database = new DuckDbLogDatabase(arguments.database())) {
-        long records = database.load(inputFiles);
-        System.err.printf("Loaded %,d record(s) from %,d file(s)%n", records, inputFiles.size());
-
-        if (arguments.topics()) {
-          execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
-        } else if (arguments.sql() != null) {
-          execute(database, arguments.sql(), arguments);
-        } else if (arguments.interactive() || System.console() != null) {
-          new InteractiveQueryShell(database, new QueryResultPrinter()).run();
-        } else {
-          execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
+      if (arguments.input() != null) {
+        List<Path> inputFiles = new InputFileResolver().resolve(arguments.input());
+        try (DuckDbLogDatabase database = new DuckDbLogDatabase(arguments.database())) {
+          long records = database.load(inputFiles);
+          System.err.printf("Loaded %,d record(s) from %,d file(s)%n", records, inputFiles.size());
+          inspect(database, arguments);
+        }
+      } else {
+        Path databasePath = arguments.database().toAbsolutePath().normalize();
+        if (!Files.isRegularFile(databasePath)) {
+          throw new IllegalArgumentException("DuckDB database does not exist: " + databasePath);
+        }
+        try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
+          System.err.printf("Opened DuckDB database %s%n", databasePath);
+          inspect(database, arguments);
         }
       }
       return 0;
     } catch (Exception exception) {
-      System.err.println("Unable to inspect NDJSON log: " + exception.getMessage());
+      System.err.println("Unable to inspect log data: " + exception.getMessage());
       return 1;
+    }
+  }
+
+  private static void inspect(
+      DuckDbLogDatabase database,
+      NdjsonViewerArguments arguments) throws Exception {
+    if (arguments.topics()) {
+      execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
+    } else if (arguments.sql() != null) {
+      execute(database, arguments.sql(), arguments);
+    } else if (arguments.interactive() || System.console() != null) {
+      new InteractiveQueryShell(database, new QueryResultPrinter()).run();
+    } else {
+      execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
     }
   }
 
@@ -80,7 +97,7 @@ public final class MapsNdjsonViewerMain {
         }
       };
     }
-    java.nio.file.Path parent = arguments.output().toAbsolutePath().normalize().getParent();
+    Path parent = arguments.output().toAbsolutePath().normalize().getParent();
     if (parent != null) {
       Files.createDirectories(parent);
     }
@@ -88,15 +105,16 @@ public final class MapsNdjsonViewerMain {
   }
 
   private static void printUsage(java.io.PrintStream output) {
-    output.println("Usage: maps-ndjson-viewer <file-or-directory> [options]");
+    output.println("Usage: maps-ndjson-viewer [file-or-directory] [options]");
     output.println("  --topics                 list topics and record counts");
     output.println("  --sql <query>            execute SQL against maps_log or mavlink_log");
     output.println("  --interactive            open the SQL prompt, including inside an IDE");
-    output.println("  --database <file>        persist the imported data in a DuckDB database");
+    output.println("  --database <file>        persist imports or open an existing DuckDB database");
     output.println("  --format table|ndjson|csv|raw");
     output.println("  --raw                    emit a single selected column without a result envelope");
     output.println("  --output <file>          write query results to a file");
     output.println();
+    output.println("Without an input path, --database must name an existing database.");
     output.println("With no query in an interactive terminal, an SQL prompt is opened.");
   }
 }
