@@ -27,6 +27,7 @@ final class QueryResultPrinter {
       case TABLE -> printTable(resultSet, output);
       case NDJSON -> printNdjson(resultSet, output);
       case CSV -> printCsv(resultSet, output);
+      case RAW -> printRaw(resultSet, output);
     };
   }
 
@@ -94,6 +95,29 @@ final class QueryResultPrinter {
         output.print(csv(toDisplayValue(resultSet.getObject(column))));
       }
       output.println();
+      rows++;
+    }
+    output.flush();
+    return rows;
+  }
+
+  private long printRaw(ResultSet resultSet, PrintWriter output) throws SQLException {
+    ResultSetMetaData metadata = resultSet.getMetaData();
+    if (metadata.getColumnCount() != 1) {
+      throw new IllegalArgumentException("Raw output requires exactly one selected column");
+    }
+
+    boolean json = "JSON".equalsIgnoreCase(metadata.getColumnTypeName(1));
+    long rows = 0;
+    while (resultSet.next()) {
+      Object value = resultSet.getObject(1);
+      if (value == null) {
+        output.println("null");
+      } else if (json) {
+        output.println(value);
+      } else {
+        output.println(toDisplayValue(value));
+      }
       rows++;
     }
     output.flush();

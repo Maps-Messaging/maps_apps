@@ -35,6 +35,22 @@ class NdjsonViewerArgumentsTest {
   }
 
   @Test
+  void parsesRawFormat() {
+    NdjsonViewerArguments arguments = NdjsonViewerArguments.parse(
+        new String[] {"log.ndjson", "--sql", "SELECT payload FROM maps_log", "--format", "raw"});
+
+    assertEquals(QueryOutputFormat.RAW, arguments.format());
+  }
+
+  @Test
+  void enablesRawOutputAlias() {
+    NdjsonViewerArguments arguments = NdjsonViewerArguments.parse(
+        new String[] {"log.ndjson", "--sql", "SELECT payload FROM maps_log", "--raw"});
+
+    assertEquals(QueryOutputFormat.RAW, arguments.format());
+  }
+
+  @Test
   void rejectsTopicsAndSqlTogether() {
     assertThrows(
         IllegalArgumentException.class,

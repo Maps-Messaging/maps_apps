@@ -1,4 +1,4 @@
-.TH MAPS-NDJSON-VIEWER 1 "9 September 2026" "maps-apps 1.0.0" "User Commands"
+.TH MAPS-NDJSON-VIEWER 1 "14 September 2026" "maps-apps 1.0.0" "User Commands"
 .SH NAME
 maps-ndjson-viewer \- query decoded MAPS NDJSON message logs
 .SH SYNOPSIS
@@ -26,12 +26,24 @@ Open the interactive SQL prompt, including when launched from an IDE.
 .BI --database " file"
 Persist the imported records in a DuckDB database file.
 .TP
-.BI --format " table|ndjson|csv"
-Select the result format.
+.BI --format " table|ndjson|csv|raw"
+Select the result format. Raw output requires exactly one selected column and writes its
+value directly without a result envelope.
+.TP
+.B --raw
+Equivalent to --format raw.
 .TP
 .BI --output " file"
 Write results to a file. A .csv suffix selects CSV; other suffixes select NDJSON unless
---format is specified.
+--format or --raw is specified.
+.SH EXAMPLES
+Extract STANAG task requests as replayable JSONL payloads:
+.PP
+.nf
+maps-ndjson-viewer /Volumes/workVault/sesimbra-2/maps-logger \
+  --sql "SELECT payload FROM maps_log WHERE topic LIKE '%/MessageTypeEnum_TASK_ADMIN' ORDER BY receivedTimestamp" \
+  --raw --output tasking.jsonl
+.fi
 .SH INTERACTIVE COMMANDS
 .TP
 .B .topics

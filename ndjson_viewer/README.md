@@ -63,7 +63,18 @@ maps-ndjson-viewer telemetry.ndjson \
   --output status.csv
 ```
 
-An output filename ending in `.csv` selects CSV. Other output filenames default to NDJSON. The format can be selected explicitly with `--format table`, `--format ndjson`, or `--format csv`.
+Export a single selected column without a result envelope with `--raw` or `--format raw`. Raw mode requires exactly one selected column. JSON values are written as JSON rather than quoted strings.
+
+For example, extract all recorded STANAG task requests as replayable JSONL payloads:
+
+```bash
+maps-ndjson-viewer /Volumes/workVault/sesimbra-2/maps-logger \
+  --sql "SELECT payload FROM maps_log WHERE topic LIKE '%/MessageTypeEnum_TASK_ADMIN' ORDER BY receivedTimestamp" \
+  --raw \
+  --output tasking.jsonl
+```
+
+An output filename ending in `.csv` selects CSV. Other output filenames default to NDJSON. The format can be selected explicitly with `--format table`, `--format ndjson`, `--format csv`, or `--format raw`.
 
 ## Interactive commands
 

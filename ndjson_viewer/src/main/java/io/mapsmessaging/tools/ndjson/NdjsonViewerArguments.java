@@ -35,6 +35,7 @@ record NdjsonViewerArguments(
         case "--output" -> output = Path.of(requireValue(args, ++index, option));
         case "--sql" -> sql = requireValue(args, ++index, option);
         case "--format" -> format = QueryOutputFormat.parse(requireValue(args, ++index, option));
+        case "--raw" -> format = QueryOutputFormat.RAW;
         case "--topics" -> topics = true;
         case "--interactive" -> interactive = true;
         case "--help", "-h" -> throw new HelpRequestedException();

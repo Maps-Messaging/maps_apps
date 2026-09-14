@@ -93,7 +93,8 @@ public final class MapsNdjsonViewerMain {
     output.println("  --sql <query>            execute SQL against maps_log or mavlink_log");
     output.println("  --interactive            open the SQL prompt, including inside an IDE");
     output.println("  --database <file>        persist the imported data in a DuckDB database");
-    output.println("  --format table|ndjson|csv");
+    output.println("  --format table|ndjson|csv|raw");
+    output.println("  --raw                    emit a single selected column without a result envelope");
     output.println("  --output <file>          write query results to a file");
     output.println();
     output.println("With no query in an interactive terminal, an SQL prompt is opened.");
