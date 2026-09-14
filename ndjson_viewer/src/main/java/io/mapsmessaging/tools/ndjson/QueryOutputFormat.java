@@ -7,13 +7,15 @@ package io.mapsmessaging.tools.ndjson;
 enum QueryOutputFormat {
   TABLE,
   NDJSON,
-  CSV;
+  CSV,
+  RAW;
 
   static QueryOutputFormat parse(String value) {
     return switch (value.toLowerCase()) {
       case "table" -> TABLE;
       case "ndjson", "json" -> NDJSON;
       case "csv" -> CSV;
+      case "raw" -> RAW;
       default -> throw new IllegalArgumentException("Unknown output format: " + value);
     };
   }

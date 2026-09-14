@@ -7,6 +7,7 @@ package io.mapsmessaging.tools.ndjson;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -76,6 +77,57 @@ class DuckDbLogDatabaseTest {
       }
 
       assertTrue(output.toString().contains("\"payload\":{\"yaw\":1.25}"));
+    }
+  }
+
+  @Test
+  void exportsRawJsonPayloadWithoutEnvelope() throws Exception {
+    Path input = temporaryDirectory.resolve("maps.ndjson");
+    Files.writeString(input, envelope("4817/task", "{\"taskId\":\"task-1\",\"action\":\"PUSH\"}"));
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
+      database.load(List.of(input));
+      StringWriter output = new StringWriter();
+      try (DuckDbLogDatabase.Query query = database.query("SELECT payload FROM maps_log")) {
+        new QueryResultPrinter()
+            .print(query.resultSet(), QueryOutputFormat.RAW, new PrintWriter(output));
+      }
+
+      assertEquals("{\"taskId\":\"task-1\",\"action\":\"PUSH\"}\n", output.toString());
+    }
+  }
+
+  @Test
+  void exportsRawScalarWithoutEnvelope() throws Exception {
+    Path input = temporaryDirectory.resolve("maps.ndjson");
+    Files.writeString(input, envelope("4817/task", "{\"state\":\"ACTIVE\"}"));
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
+      database.load(List.of(input));
+      StringWriter output = new StringWriter();
+      try (DuckDbLogDatabase.Query query = database.query("SELECT 'ACTIVE' AS state FROM maps_log")) {
+        new QueryResultPrinter()
+            .print(query.resultSet(), QueryOutputFormat.RAW, new PrintWriter(output));
+      }
+
+      assertEquals("ACTIVE\n", output.toString());
+    }
+  }
+
+  @Test
+  void rejectsMultipleColumnsForRawOutput() throws Exception {
+    Path input = temporaryDirectory.resolve("maps.ndjson");
+    Files.writeString(input, envelope("4817/task", "{\"state\":\"ACTIVE\"}"));
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
+      database.load(List.of(input));
+      try (DuckDbLogDatabase.Query query = database.query("SELECT topic, payload FROM maps_log")) {
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> new QueryResultPrinter()
+                .print(query.resultSet(), QueryOutputFormat.RAW, new PrintWriter(new StringWriter())));
+        assertEquals("Raw output requires exactly one selected column", exception.getMessage());
+      }
     }
   }
 

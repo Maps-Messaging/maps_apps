@@ -5,6 +5,7 @@
 package io.mapsmessaging.tools.ndjson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,12 +27,49 @@ class NdjsonViewerArgumentsTest {
   }
 
   @Test
+  void opensExistingDatabaseWithoutInputPath() {
+    NdjsonViewerArguments arguments = NdjsonViewerArguments.parse(
+        new String[] {"--database", "analysis.duckdb", "--sql", "SELECT * FROM maps_log"});
+
+    assertNull(arguments.input());
+    assertEquals(Path.of("analysis.duckdb"), arguments.database());
+    assertEquals("SELECT * FROM maps_log", arguments.sql());
+  }
+
+  @Test
+  void rejectsOptionsWithoutInputOrDatabase() {
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class,
+        () -> NdjsonViewerArguments.parse(new String[] {"--sql", "SELECT 1"}));
+
+    assertEquals(
+        "Either an input file/directory or --database <file> is required",
+        exception.getMessage());
+  }
+
+  @Test
   void infersNdjsonForOutputFile() {
     NdjsonViewerArguments arguments = NdjsonViewerArguments.parse(
         new String[] {"log.ndjson", "--topics", "--output", "topics.ndjson"});
 
     assertTrue(arguments.topics());
     assertEquals(QueryOutputFormat.NDJSON, arguments.format());
+  }
+
+  @Test
+  void parsesRawFormat() {
+    NdjsonViewerArguments arguments = NdjsonViewerArguments.parse(
+        new String[] {"log.ndjson", "--sql", "SELECT payload FROM maps_log", "--format", "raw"});
+
+    assertEquals(QueryOutputFormat.RAW, arguments.format());
+  }
+
+  @Test
+  void enablesRawOutputAlias() {
+    NdjsonViewerArguments arguments = NdjsonViewerArguments.parse(
+        new String[] {"log.ndjson", "--sql", "SELECT payload FROM maps_log", "--raw"});
+
+    assertEquals(QueryOutputFormat.RAW, arguments.format());
   }
 
   @Test

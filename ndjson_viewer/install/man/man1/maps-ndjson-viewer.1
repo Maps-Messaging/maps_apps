@@ -1,14 +1,17 @@
-.TH MAPS-NDJSON-VIEWER 1 "9 September 2026" "maps-apps 1.0.0" "User Commands"
+.TH MAPS-NDJSON-VIEWER 1 "14 September 2026" "maps-apps 1.0.0" "User Commands"
 .SH NAME
 maps-ndjson-viewer \- query decoded MAPS NDJSON message logs
 .SH SYNOPSIS
 .B maps-ndjson-viewer
-.I file-or-directory
+.RI [ file-or-directory ]
 .RI [ options ]
 .SH DESCRIPTION
 .B maps-ndjson-viewer
 loads MAPS message-log NDJSON through embedded DuckDB, decodes Base64 opaqueData,
 and exposes decoded JSON for SQL analysis. Directories are searched recursively.
+.PP
+An existing DuckDB database can be opened directly by supplying --database without an
+input path. In that mode no log import is performed and the database must already exist.
 .PP
 The relations maps_log and mavlink_log are available to queries. No external database
 server or DuckDB installation is required.
@@ -24,14 +27,27 @@ Execute DuckDB SQL against maps_log or mavlink_log.
 Open the interactive SQL prompt, including when launched from an IDE.
 .TP
 .BI --database " file"
-Persist the imported records in a DuckDB database file.
+Persist imported records in a DuckDB database file, or open an existing database when
+no input path is supplied.
 .TP
-.BI --format " table|ndjson|csv"
-Select the result format.
+.BI --format " table|ndjson|csv|raw"
+Select the result format. Raw output requires exactly one selected column and writes its
+value directly without a result envelope.
+.TP
+.B --raw
+Equivalent to --format raw.
 .TP
 .BI --output " file"
 Write results to a file. A .csv suffix selects CSV; other suffixes select NDJSON unless
---format is specified.
+--format or --raw is specified.
+.SH EXAMPLES
+Open an existing database and extract STANAG task requests as replayable JSONL payloads:
+.PP
+.nf
+maps-ndjson-viewer --database telemetry.duckdb \
+  --sql "SELECT payload FROM maps_log WHERE topic LIKE '%/MessageTypeEnum_TASK_ADMIN' ORDER BY receivedTimestamp" \
+  --raw --output tasking.jsonl
+.fi
 .SH INTERACTIVE COMMANDS
 .TP
 .B .topics
