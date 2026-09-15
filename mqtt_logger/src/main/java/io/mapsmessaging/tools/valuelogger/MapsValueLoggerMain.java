@@ -3,24 +3,35 @@ package io.mapsmessaging.tools.valuelogger;
 public class MapsValueLoggerMain {
 
   public static void main(String[] args) {
+    MapsValueLogger logger = null;
+    int exitCode = 0;
+
     try {
       MapsValueLoggerArguments arguments = MapsValueLoggerArguments.parse(args);
 
-      MapsValueLogger logger = new MapsValueLogger(arguments);
+      logger = new MapsValueLogger(arguments);
+      MapsValueLogger shutdownLogger = logger;
+      Runtime.getRuntime().addShutdownHook(new Thread(shutdownLogger::stop));
+
       logger.start();
-
-      Runtime.getRuntime().addShutdownHook(new Thread(logger::stop));
-
-      Thread.currentThread().join();
+      logger.await();
     } catch (IllegalArgumentException exception) {
       System.err.println(exception.getMessage());
       MapsValueLoggerArguments.printUsage();
-      System.exit(1);
+      exitCode = 1;
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
     } catch (Exception exception) {
       exception.printStackTrace(System.err);
-      System.exit(2);
+      exitCode = 2;
+    } finally {
+      if (logger != null) {
+        logger.stop();
+      }
+    }
+
+    if (exitCode != 0) {
+      System.exit(exitCode);
     }
   }
 }
