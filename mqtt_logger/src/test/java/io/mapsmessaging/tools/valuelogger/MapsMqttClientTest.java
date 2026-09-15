@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,12 +38,13 @@ class MapsMqttClientTest {
     ScheduledExecutorService healthExecutor = mock(ScheduledExecutorService.class);
     ScheduledFuture<?> healthTask = mock(ScheduledFuture.class);
 
-    when(healthExecutor.scheduleWithFixedDelay(
-        any(Runnable.class),
-        eq(MapsMqttClient.HEALTH_CHECK_INITIAL_DELAY_SECONDS),
-        eq(MapsMqttClient.HEALTH_CHECK_PERIOD_SECONDS),
-        eq(java.util.concurrent.TimeUnit.SECONDS)))
-        .thenReturn(healthTask);
+    doReturn(healthTask)
+        .when(healthExecutor)
+        .scheduleWithFixedDelay(
+            any(Runnable.class),
+            eq(MapsMqttClient.HEALTH_CHECK_INITIAL_DELAY_SECONDS),
+            eq(MapsMqttClient.HEALTH_CHECK_PERIOD_SECONDS),
+            eq(java.util.concurrent.TimeUnit.SECONDS));
 
     MapsMqttClient mqttClient =
         new MapsMqttClient(
@@ -78,12 +80,13 @@ class MapsMqttClientTest {
     ScheduledFuture<?> healthTask = mock(ScheduledFuture.class);
 
     ArgumentCaptor<Runnable> healthCheck = ArgumentCaptor.forClass(Runnable.class);
-    when(healthExecutor.scheduleWithFixedDelay(
-        healthCheck.capture(),
-        eq(MapsMqttClient.HEALTH_CHECK_INITIAL_DELAY_SECONDS),
-        eq(MapsMqttClient.HEALTH_CHECK_PERIOD_SECONDS),
-        eq(java.util.concurrent.TimeUnit.SECONDS)))
-        .thenReturn(healthTask);
+    doReturn(healthTask)
+        .when(healthExecutor)
+        .scheduleWithFixedDelay(
+            healthCheck.capture(),
+            eq(MapsMqttClient.HEALTH_CHECK_INITIAL_DELAY_SECONDS),
+            eq(MapsMqttClient.HEALTH_CHECK_PERIOD_SECONDS),
+            eq(java.util.concurrent.TimeUnit.SECONDS));
 
     MapsMqttClient mqttClient =
         new MapsMqttClient(
