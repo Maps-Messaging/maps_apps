@@ -85,7 +85,9 @@
 
         <maven.compiler.release>21</maven.compiler.release>
 
-        <nvd.api.key>${env.NVD_API_KEY}</nvd.api.key>
+        <dependency.check.autoUpdate>true</dependency.check.autoUpdate>
+
+        <dependency.check.dataDirectory>${user.home}/.m2/repository/org/owasp/dependency-check-data/</dependency.check.dataDirectory>
         <gpg.keyname>matthew.buckton@mapsmessaging.io</gpg.keyname>
 
         <runSuite>**/*Suite.class</runSuite>
@@ -111,7 +113,7 @@
         <version.jacoco>0.8.14</version.jacoco>
         <version.cyclonedx>2.9.1</version.cyclonedx>
         <version.buildHelper>3.6.1</version.buildHelper>
-        <version.dependencyCheck>12.1.8</version.dependencyCheck>
+        <version.dependencyCheck>13.0.0</version.dependencyCheck>
         <version.centralPublishing>0.9.0</version.centralPublishing>
     </properties>
 
@@ -344,7 +346,8 @@
                     <artifactId>dependency-check-maven</artifactId>
                     <version>${version.dependencyCheck}</version>
                     <configuration>
-                        <nvdApiKey>${nvd.api.key}</nvdApiKey>
+                        <autoUpdate>${dependency.check.autoUpdate}</autoUpdate>
+                        <dataDirectory>${dependency.check.dataDirectory}</dataDirectory>
                         <failBuildOnCVSS>10</failBuildOnCVSS>
                         <failOnError>false</failOnError>
                         <skipArtifactType>test-jar</skipArtifactType>
@@ -363,9 +366,29 @@
 
         <plugins>
             <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+            </plugin>
+            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
+  <profiles>
+    <profile>
+      <id>buildkite-dependency-check-cache</id>
+      <activation>
+        <property>
+          <name>env.BUILDKITE</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <dependency.check.autoUpdate>false</dependency.check.autoUpdate>
+        <dependency.check.dataDirectory>/var/cache/dependency-check/13</dependency.check.dataDirectory>
+      </properties>
+    </profile>
+  </profiles>
+
 </project>
