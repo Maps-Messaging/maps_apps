@@ -13,7 +13,8 @@ record NdjsonViewerArguments(
     String sql,
     QueryOutputFormat format,
     boolean topics,
-    boolean interactive) {
+    boolean interactive,
+    boolean ui) {
 
   static NdjsonViewerArguments parse(String[] args) {
     if (args.length == 0) {
@@ -27,6 +28,7 @@ record NdjsonViewerArguments(
     QueryOutputFormat format = QueryOutputFormat.TABLE;
     boolean topics = false;
     boolean interactive = false;
+    boolean ui = false;
 
     int firstOption = 0;
     if (!args[0].startsWith("-")) {
@@ -44,6 +46,7 @@ record NdjsonViewerArguments(
         case "--raw" -> format = QueryOutputFormat.RAW;
         case "--topics" -> topics = true;
         case "--interactive" -> interactive = true;
+        case "-ui", "--ui" -> ui = true;
         case "--help", "-h" -> throw new HelpRequestedException();
         default -> throw new IllegalArgumentException("Unknown option: " + option);
       }
@@ -54,15 +57,18 @@ record NdjsonViewerArguments(
           "Either an input file/directory or --database <file> is required");
     }
 
-    int operationCount = (topics ? 1 : 0) + (sql == null ? 0 : 1) + (interactive ? 1 : 0);
+    int operationCount =
+        (topics ? 1 : 0) + (sql == null ? 0 : 1) + (interactive ? 1 : 0) + (ui ? 1 : 0);
     if (operationCount > 1) {
-      throw new IllegalArgumentException("--topics, --sql and --interactive are mutually exclusive");
+      throw new IllegalArgumentException(
+          "--topics, --sql, --interactive and -ui/--ui are mutually exclusive");
     }
     if (output != null && format == QueryOutputFormat.TABLE) {
       format = inferOutputFormat(output);
     }
 
-    return new NdjsonViewerArguments(input, database, output, sql, format, topics, interactive);
+    return new NdjsonViewerArguments(
+        input, database, output, sql, format, topics, interactive, ui);
   }
 
   private static String requireValue(String[] args, int index, String option) {

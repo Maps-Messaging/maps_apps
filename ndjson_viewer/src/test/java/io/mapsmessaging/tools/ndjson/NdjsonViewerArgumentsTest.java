@@ -96,4 +96,29 @@ class NdjsonViewerArgumentsTest {
             NdjsonViewerArguments.parse(
                 new String[] {"log.ndjson", "--interactive", "--topics"}));
   }
+
+  @Test
+  void enablesDuckDbUiMode() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(new String[] {"log.ndjson", "-ui"});
+
+    assertTrue(arguments.ui());
+  }
+
+  @Test
+  void enablesDuckDbUiLongAlias() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(new String[] {"--database", "analysis.duckdb", "--ui"});
+
+    assertTrue(arguments.ui());
+  }
+
+  @Test
+  void rejectsDuckDbUiWithAnotherOperation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            NdjsonViewerArguments.parse(
+                new String[] {"log.ndjson", "-ui", "--topics"}));
+  }
 }
