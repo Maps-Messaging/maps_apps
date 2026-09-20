@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 public final class MapsNdjsonViewerMain {
 
@@ -67,10 +68,24 @@ public final class MapsNdjsonViewerMain {
       execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
     } else if (arguments.sql() != null) {
       execute(database, arguments.sql(), arguments);
+    } else if (arguments.ui()) {
+      runUi(database);
     } else if (arguments.interactive() || System.console() != null) {
       new InteractiveQueryShell(database, new QueryResultPrinter()).run();
     } else {
       execute(database, DuckDbLogDatabase.TOPICS_SQL, arguments);
+    }
+  }
+
+  private static void runUi(DuckDbLogDatabase database) throws Exception {
+    try (DuckDbLogDatabase.Query ignored = database.query("CALL start_ui()")) {
+      // Starting the UI returns immediately. Keep the database open below.
+    }
+    System.err.println("DuckDB UI started in the default browser. Press Ctrl-C to stop.");
+    try {
+      new CountDownLatch(1).await();
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -109,6 +124,7 @@ public final class MapsNdjsonViewerMain {
     output.println("  --topics                 list topics and record counts");
     output.println("  --sql <query>            execute SQL against maps_log or mavlink_log");
     output.println("  --interactive            open the SQL prompt, including inside an IDE");
+    output.println("  -ui, --ui                open the DuckDB UI in the default browser");
     output.println("  --database <file>        persist imports or open an existing DuckDB database");
     output.println("  --format table|ndjson|csv|raw");
     output.println("  --raw                    emit a single selected column without a result envelope");

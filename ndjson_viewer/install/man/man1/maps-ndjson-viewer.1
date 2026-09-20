@@ -1,4 +1,4 @@
-.TH MAPS-NDJSON-VIEWER 1 "14 September 2026" "maps-apps 1.0.0" "User Commands"
+.TH MAPS-NDJSON-VIEWER 1 "20 September 2026" "maps-apps 1.0.0" "User Commands"
 .SH NAME
 maps-ndjson-viewer \- query decoded MAPS NDJSON message logs
 .SH SYNOPSIS
@@ -26,6 +26,10 @@ Execute DuckDB SQL against maps_log or mavlink_log.
 .B --interactive
 Open the interactive SQL prompt, including when launched from an IDE.
 .TP
+.B "-ui, --ui"
+Open the DuckDB UI in the default browser against the same embedded DuckDB instance.
+The viewer remains running until it is terminated.
+.TP
 .BI --database " file"
 Persist imported records in a DuckDB database file, or open an existing database when
 no input path is supplied.
@@ -41,6 +45,12 @@ Equivalent to --format raw.
 Write results to a file. A .csv suffix selects CSV; other suffixes select NDJSON unless
 --format or --raw is specified.
 .SH EXAMPLES
+Open an existing database in the DuckDB UI:
+.PP
+.nf
+maps-ndjson-viewer --database telemetry.duckdb -ui
+.fi
+.PP
 Open an existing database and extract STANAG task requests as replayable JSONL payloads:
 .PP
 .nf
