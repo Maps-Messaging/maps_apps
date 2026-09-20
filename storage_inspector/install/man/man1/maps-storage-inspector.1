@@ -1,0 +1,59 @@
+.TH MAPS-STORAGE-INSPECTOR 1 "September 2026" "MapsMessaging" "User Commands"
+.SH NAME
+maps-storage-inspector \- inspect and export MAPS dynamic storage
+.SH SYNOPSIS
+.B maps-storage-inspector
+.B --input
+.I path
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-storage-inspector
+performs read-only offline inspection of MAPS dynamic storage partition stores.
+It can validate storage structure, decode stored messages using compatible MAPS
+server libraries, and export active events as NDJSON.
+.PP
+Use a stopped-server copy or filesystem snapshot when investigating possible
+corruption. The inspector does not intentionally modify the input store.
+.SH OPTIONS
+.TP
+.BI --input " path"
+Storage snapshot, destination, store, or partition input path.
+.TP
+.B --decode
+Decode selected messages without writing an event export.
+.TP
+.BI --output " file"
+Write decoded active events as NDJSON.
+.TP
+.BI --report " file"
+Write inspection findings and summary records as NDJSON.
+.TP
+.BI --destination " name"
+Select a destination by its exact resource name.
+.TP
+.BI --start-event-id " id"
+Select events starting at the inclusive event identifier.
+.TP
+.BI --end-event-id " id"
+Select events ending at the inclusive event identifier.
+.TP
+.BI --threads " count"
+Set inspection worker count. The default is 4.
+.TP
+.BI --max-record-bytes " bytes"
+Set the maximum storage record size accepted during inspection.
+.TP
+.BI --max-archive-bytes " bytes"
+Set the maximum expanded compressed-partition size.
+.SH EXIT STATUS
+0 indicates completed checks, 1 corruption or read failure, 2 usage/runtime/output
+failure, and 3 warnings or incomplete coverage.
+.SH FILES
+The tool reads MAPS dynamic storage snapshots and may create NDJSON report and
+event export files specified by the operator.
+.SH SEE ALSO
+.BR maps-ndjson-viewer (1),
+.BR maps-apps (7)
+.SH DOCUMENTATION
+See storage_inspector/docs/storage-inspector.md in the maps_apps source tree and
+storage_inspector/README.md for detailed storage-format and operational guidance.
