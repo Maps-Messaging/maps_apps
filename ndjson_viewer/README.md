@@ -1,5 +1,7 @@
 # MAPS NDJSON Viewer
 
+For installation, operational usage, common queries, exports, and manual-page details, see the [MAPS NDJSON Viewer User Guide](../docs/maps-ndjson-viewer.md).
+
 `maps-ndjson-viewer` loads MAPS message-log NDJSON into an embedded DuckDB database. It decodes the Base64 `opaqueData` column and exposes the decoded value as JSON for SQL filtering and field selection.
 
 No DuckDB server or separate DuckDB installation is required. The JDBC driver runs inside the Java process.
