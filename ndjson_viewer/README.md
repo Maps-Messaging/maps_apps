@@ -42,6 +42,14 @@ When launching from an IDE or another environment without a Java console, reques
 maps-ndjson-viewer /var/log/maps-logger --interactive
 ```
 
+Open the DuckDB UI against the loaded log data:
+
+```bash
+maps-ndjson-viewer /var/log/maps-logger -ui
+```
+
+The UI is started from the same embedded DuckDB instance, so `raw_log`, `maps_log`, `mavlink_log` and any persisted relations are immediately available. The viewer stays running while the UI is open; stop it with Ctrl-C.
+
 Run one query:
 
 ```bash
@@ -63,7 +71,15 @@ maps-ndjson-viewer \
   --sql "SELECT receivedTimestamp, topic, payload FROM maps_log ORDER BY receivedTimestamp"
 ```
 
+Or open that existing database directly in the DuckDB UI:
+
+```bash
+maps-ndjson-viewer --database telemetry.duckdb -ui
+```
+
 When no input path is supplied, the database file must already exist. The viewer opens it directly and does not call the log import path, so existing `raw_log`, `maps_log`, and other stored tables are left untouched.
+
+DuckDB serves the UI locally. By default the UI frontend is fetched from `https://ui.duckdb.org`; queries and loaded data remain local unless MotherDuck is explicitly enabled. See the DuckDB UI extension documentation for deployment and offline considerations.
 
 Export selected fields:
 
