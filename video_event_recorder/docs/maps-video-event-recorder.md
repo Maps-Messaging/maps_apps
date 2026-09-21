@@ -12,7 +12,7 @@ The worker deliberately knows only about:
 - private S3 object storage;
 - temporary presigned HTTPS URLs.
 
-It does not interpret STANAG 4817, CoT, MAVLink, N2K, or any other upstream event protocol.
+It does not interpret any upstream event or tasking protocol.
 
 ## Timing
 
