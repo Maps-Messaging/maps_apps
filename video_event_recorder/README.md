@@ -2,7 +2,7 @@
 
 Protocol-agnostic event-triggered video capture for MapsMessaging deployments.
 
-The recorder consumes generic JSON recording requests over MQTT, retrieves an MP4 clip from the MediaMTX playback service, uploads the clip to Amazon S3, and publishes a generic JSON result. It has no dependency on STANAG 4817 or any other tasking protocol.
+The recorder consumes generic JSON recording requests over MQTT, retrieves an MP4 clip from the MediaMTX playback service, uploads the clip to Amazon S3, and publishes a generic JSON result. It has no dependency on protocol-specific tasking schemas.
 
 ## Flow
 
