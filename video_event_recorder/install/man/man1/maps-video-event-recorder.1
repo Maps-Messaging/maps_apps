@@ -1,0 +1,134 @@
+.TH MAPS-VIDEO-EVENT-RECORDER 1 "21 September 2026" "maps-apps 1.0.0" "User Commands"
+.SH NAME
+maps-video-event-recorder \- create event-centred MediaMTX clips and publish S3 URLs
+.SH SYNOPSIS
+.B maps-video-event-recorder
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-video-event-recorder
+subscribes to a generic MQTT recording-request topic, waits until the requested post-event
+interval has elapsed, downloads an MP4 clip from the MediaMTX playback service, uploads the
+clip to private Amazon S3 storage, and publishes a generic MQTT result containing a
+presigned HTTPS URL.
+.PP
+The recorder is protocol agnostic.  It does not contain STANAG 4817 or other tasking
+protocol logic.
+.SH REQUIRED OPTIONS
+Options can also be supplied with the corresponding environment variables.
+.TP
+.BI --mqtt-url " URL"
+MQTT broker URL.
+.TP
+.BI --mediamtx-url " URL"
+MediaMTX playback HTTP endpoint, for example http://127.0.0.1:9996.
+.TP
+.BI --s3-bucket " BUCKET"
+Private destination S3 bucket.
+.TP
+.BI --s3-region " REGION"
+AWS region containing the bucket.
+.SH OPTIONS
+.TP
+.BI --request-topic " TOPIC"
+Request topic. Default: maps/video/record/request.
+.TP
+.BI --result-topic " TOPIC"
+Result topic. Default: maps/video/record/result.
+.TP
+.BI --qos " N"
+MQTT QoS, 0 through 2. Default: 1.
+.TP
+.BI --before-seconds " N"
+Default number of seconds before event time. Default: 30.
+.TP
+.BI --after-seconds " N"
+Default number of seconds after event time. Default: 60.
+.TP
+.BI --settle-seconds " N"
+Additional delay before querying MediaMTX. Default: 2.
+.TP
+.BI --dedupe-retention-seconds " N"
+Duplicate-suppression retention. Default: 1800.
+.TP
+.BI --url-validity-seconds " N"
+Presigned S3 URL validity. Default: 86400; maximum: 604800.
+.TP
+.BI --s3-prefix " PREFIX"
+S3 object-key prefix. Default: detections.
+.TP
+.BI --mqtt-username " USER"
+Optional MQTT username.
+.TP
+.BI --mqtt-password " PASSWORD"
+Optional MQTT password.
+.TP
+.BI --mediamtx-username " USER"
+Optional MediaMTX playback username.
+.TP
+.BI --mediamtx-password " PASSWORD"
+Optional MediaMTX playback password.
+.SH ENVIRONMENT
+.TP
+.B MAPS_VIDEO_MQTT_URL
+MQTT broker URL.
+.TP
+.B MAPS_VIDEO_MQTT_USERNAME
+Optional MQTT username.
+.TP
+.B MAPS_VIDEO_MQTT_PASSWORD
+Optional MQTT password.
+.TP
+.B MAPS_VIDEO_REQUEST_TOPIC
+Request topic.
+.TP
+.B MAPS_VIDEO_RESULT_TOPIC
+Result topic.
+.TP
+.B MAPS_VIDEO_QOS
+MQTT QoS.
+.TP
+.B MAPS_VIDEO_MEDIAMTX_URL
+MediaMTX playback endpoint.
+.TP
+.B MAPS_VIDEO_MEDIAMTX_USERNAME
+Optional MediaMTX username.
+.TP
+.B MAPS_VIDEO_MEDIAMTX_PASSWORD
+Optional MediaMTX password.
+.TP
+.B MAPS_VIDEO_S3_BUCKET
+Destination bucket.
+.TP
+.B MAPS_VIDEO_S3_REGION
+AWS region.
+.TP
+.B MAPS_VIDEO_S3_PREFIX
+Object-key prefix.
+.TP
+.B MAPS_VIDEO_BEFORE_SECONDS
+Default pre-event interval.
+.TP
+.B MAPS_VIDEO_AFTER_SECONDS
+Default post-event interval.
+.TP
+.B MAPS_VIDEO_DEDUPE_RETENTION_SECONDS
+Duplicate-retention period.
+.TP
+.B MAPS_VIDEO_URL_VALIDITY_SECONDS
+Presigned URL lifetime.
+.TP
+.B MAPS_VIDEO_SETTLE_SECONDS
+Additional MediaMTX settle delay.
+.SH AWS CREDENTIALS
+AWS credentials are resolved using the standard AWS SDK default credential provider chain.
+Access keys are not configured by this application.
+.SH FILES
+.TP
+.I /opt/maps/apps/video_event_recorder.jar
+Executable installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.
