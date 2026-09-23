@@ -23,6 +23,10 @@
     <name>MAPS NDJSON Viewer</name>
     <description>Decode and inspect MAPS NDJSON message logs</description>
 
+    <properties>
+        <version.jetty>12.1.13</version.jetty>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.duckdb</groupId>
@@ -36,6 +40,16 @@
             <groupId>io.modelcontextprotocol.sdk</groupId>
             <artifactId>mcp</artifactId>
             <version>2.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>${version.jetty}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty.ee11</groupId>
+            <artifactId>jetty-ee11-servlet</artifactId>
+            <version>${version.jetty}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

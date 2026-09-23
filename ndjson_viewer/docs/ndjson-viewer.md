@@ -30,21 +30,27 @@ The UI uses the same embedded DuckDB instance, so imported and persisted relatio
 
 ## MCP access
 
-Run the viewer as a local stdio MCP server:
+Local stdio transport:
 
 ```bash
 maps-ndjson-viewer --database telemetry.duckdb --mcp
 ```
 
-It exposes `list_relations`, `describe_relation`, `list_topics`, and `query_sql`. MCP SQL is read-only, external DuckDB access is disabled, and query results are limited to 200 rows by default with a maximum of 5,000.
-
-An input file or directory can be supplied instead of an existing database:
+Streamable HTTP transport:
 
 ```bash
-maps-ndjson-viewer /var/log/maps-logger --mcp
+maps-ndjson-viewer --database telemetry.duckdb --mcp-http
 ```
 
-MCP traffic uses stdout and diagnostic messages use stderr.
+The default endpoint is `http://127.0.0.1:8090/mcp`. Remote access can be enabled explicitly:
+
+```bash
+maps-ndjson-viewer --database telemetry.duckdb --mcp-http --bind 0.0.0.0 --port 8090
+```
+
+HTTP mode has no application authentication or TLS, so non-loopback access should be protected by a firewall, VPN, SSH tunnel, or authenticated HTTPS reverse proxy.
+
+Both transports expose `list_relations`, `describe_relation`, `list_topics`, and `query_sql`. MCP SQL is read-only, external DuckDB access is disabled, and query results are limited to 200 rows by default with a maximum of 5,000.
 
 ## Persistent analysis
 

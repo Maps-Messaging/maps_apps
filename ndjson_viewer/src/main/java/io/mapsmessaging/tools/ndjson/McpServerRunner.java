@@ -12,6 +12,9 @@ import com.google.gson.JsonParser;
 import io.modelcontextprotocol.json.McpJsonDefaults;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpSyncServer;
+import io.modelcontextprotocol.server.transport.DefaultServerTransportSecurityValidator;
+import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
+import io.modelcontextprotocol.server.transport.ServerTransportSecurityValidator;
 import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema;
 import java.io.FilterInputStream;
@@ -19,17 +22,28 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.sql.SQLException;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.regex.Pattern;
+import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee11.servlet.ServletHolder;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 
 final class McpServerRunner {
 
   static final int DEFAULT_MAX_ROWS = 200;
   static final int MAX_ROWS = 5000;
+  static final String HTTP_ENDPOINT = "/mcp";
 
   private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
   private static final Pattern READ_ONLY_PREFIX = Pattern.compile(
@@ -54,20 +68,7 @@ final class McpServerRunner {
     StdioServerTransportProvider transportProvider =
         new StdioServerTransportProvider(McpJsonDefaults.getMapper(), input, System.out);
 
-    McpSyncServer server = McpServer.sync(transportProvider)
-        .serverInfo("maps-ndjson-viewer", "1.0.0")
-        .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
-        .instructions(
-            "Read-only access to MAPS NDJSON data loaded into DuckDB. "
-                + "Use list_relations and describe_relation before query_sql when the schema is unknown.")
-        .toolCall(queryTool(), (exchange, request) -> handleQuery(request.arguments()))
-        .toolCall(listTopicsTool(), (exchange, request) -> handleListTopics(request.arguments()))
-        .toolCall(
-            describeRelationTool(),
-            (exchange, request) -> handleDescribeRelation(request.arguments()))
-        .toolCall(listRelationsTool(), (exchange, request) -> handleListRelations())
-        .build();
-
+    McpSyncServer server = buildServer(McpServer.sync(transportProvider));
     Runtime.getRuntime().addShutdownHook(
         new Thread(server::close, "maps-ndjson-viewer-mcp-shutdown"));
     System.err.println("MCP server started on stdio. Press Ctrl-C to stop.");
@@ -81,7 +82,63 @@ final class McpServerRunner {
     }
   }
 
-  String executeReadOnlyQuery(String sql, int maxRows) throws SQLException {
+  void runHttp(String bindAddress, int port) throws Exception {
+    prepareForMcp();
+
+    HttpServletStreamableServerTransportProvider transportProvider =
+        HttpServletStreamableServerTransportProvider.builder()
+            .jsonMapper(McpJsonDefaults.getMapper())
+            .mcpEndpoint(HTTP_ENDPOINT)
+            .securityValidator(httpSecurityValidator(bindAddress))
+            .build();
+    McpSyncServer mcpServer = buildServer(McpServer.sync(transportProvider));
+
+    Server httpServer = new Server();
+    ServerConnector connector = new ServerConnector(httpServer);
+    connector.setHost(bindAddress);
+    connector.setPort(port);
+    httpServer.addConnector(connector);
+
+    ServletContextHandler context = new ServletContextHandler();
+    context.setContextPath("/");
+    ServletHolder servletHolder = new ServletHolder(transportProvider);
+    servletHolder.setAsyncSupported(true);
+    context.addServlet(servletHolder, "/*");
+    httpServer.setHandler(context);
+
+    Runtime.getRuntime().addShutdownHook(
+        new Thread(
+            () -> {
+              mcpServer.close();
+              try {
+                httpServer.stop();
+              } catch (Exception ignored) {
+                // JVM shutdown is already in progress.
+              }
+            },
+            "maps-ndjson-viewer-mcp-http-shutdown"));
+
+    httpServer.start();
+    System.err.printf(
+        "MCP Streamable HTTP server listening on http://%s:%d%s%n",
+        bindAddress,
+        port,
+        HTTP_ENDPOINT);
+    if (isWildcardBind(bindAddress)) {
+      System.err.println(
+          "MCP HTTP is listening on all interfaces without application authentication; "
+              + "restrict access with a firewall, VPN, SSH tunnel, or authenticated reverse proxy.");
+    }
+
+    try {
+      httpServer.join();
+    } finally {
+      mcpServer.close();
+      httpServer.stop();
+    }
+  }
+
+  synchronized String executeReadOnlyQuery(String sql, int maxRows) throws SQLException {
     if (!isReadOnlySql(sql)) {
       throw new IllegalArgumentException("MCP query_sql only accepts read-only SQL");
     }
@@ -113,7 +170,7 @@ final class McpServerRunner {
     return GSON.toJson(result);
   }
 
-  String describeRelation(String relation) throws SQLException {
+  synchronized String describeRelation(String relation) throws SQLException {
     List<String> columns = database.columns(relation);
     JsonArray values = new JsonArray();
     columns.forEach(values::add);
@@ -134,11 +191,74 @@ final class McpServerRunner {
         && !MUTATING_KEYWORD.matcher(normalized).find();
   }
 
+  static Set<String> allowedHttpHosts(String bindAddress) {
+    Set<String> hosts = new LinkedHashSet<>();
+    addHost(hosts, "localhost");
+    addHost(hosts, "127.0.0.1");
+    addHost(hosts, "::1");
+
+    if (!isWildcardBind(bindAddress)) {
+      addHost(hosts, bindAddress);
+    }
+
+    try {
+      InetAddress localHost = InetAddress.getLocalHost();
+      addHost(hosts, localHost.getHostName());
+      addHost(hosts, localHost.getCanonicalHostName());
+      addHost(hosts, localHost.getHostAddress());
+    } catch (Exception ignored) {
+      // Local host discovery is best effort.
+    }
+
+    try {
+      Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+      if (interfaces != null) {
+        while (interfaces.hasMoreElements()) {
+          Enumeration<InetAddress> addresses = interfaces.nextElement().getInetAddresses();
+          while (addresses.hasMoreElements()) {
+            addHost(hosts, addresses.nextElement().getHostAddress());
+          }
+        }
+      }
+    } catch (SocketException ignored) {
+      // Interface discovery is best effort.
+    }
+
+    return Set.copyOf(hosts);
+  }
+
+  private McpSyncServer buildServer(McpServer.SyncSpecification<?> specification) {
+    return specification
+        .serverInfo("maps-ndjson-viewer", "1.0.0")
+        .capabilities(McpSchema.ServerCapabilities.builder().tools(false).build())
+        .instructions(
+            "Read-only access to MAPS NDJSON data loaded into DuckDB. "
+                + "Use list_relations and describe_relation before query_sql when the schema is unknown.")
+        .toolCall(queryTool(), (exchange, request) -> handleQuery(request.arguments()))
+        .toolCall(listTopicsTool(), (exchange, request) -> handleListTopics(request.arguments()))
+        .toolCall(
+            describeRelationTool(),
+            (exchange, request) -> handleDescribeRelation(request.arguments()))
+        .toolCall(listRelationsTool(), (exchange, request) -> handleListRelations())
+        .build();
+  }
+
   private void prepareForMcp() throws SQLException {
     try (DuckDbLogDatabase.Query ignored =
              database.query("SET enable_external_access = false")) {
       // Prevent MCP queries from reading arbitrary local files or network resources.
     }
+  }
+
+  private ServerTransportSecurityValidator httpSecurityValidator(String bindAddress) {
+    DefaultServerTransportSecurityValidator.Builder builder =
+        DefaultServerTransportSecurityValidator.builder();
+    for (String host : allowedHttpHosts(bindAddress)) {
+      builder.allowedHost(host + ":*");
+      builder.allowedOrigin("http://" + host + ":*");
+      builder.allowedOrigin("https://" + host + ":*");
+    }
+    return builder.build();
   }
 
   private McpSchema.CallToolResult handleQuery(Map<String, Object> arguments) {
@@ -300,6 +420,28 @@ final class McpServerRunner {
       return booleanValue;
     }
     throw new IllegalArgumentException("Argument " + name + " must be a boolean");
+  }
+
+  private static boolean isWildcardBind(String bindAddress) {
+    return "0.0.0.0".equals(bindAddress)
+        || "::".equals(bindAddress)
+        || "[::]".equals(bindAddress);
+  }
+
+  private static void addHost(Set<String> hosts, String value) {
+    if (value == null || value.isBlank() || isWildcardBind(value)) {
+      return;
+    }
+
+    String host = value;
+    int zoneIndex = host.indexOf('%');
+    if (zoneIndex >= 0) {
+      host = host.substring(0, zoneIndex);
+    }
+    if (host.contains(":") && !host.startsWith("[")) {
+      host = "[" + host + "]";
+    }
+    hosts.add(host);
   }
 
   private static String stripSqlLiteralsAndComments(String sql) {

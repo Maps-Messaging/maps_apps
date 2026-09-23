@@ -72,6 +72,8 @@ public final class MapsNdjsonViewerMain {
       runUi(database);
     } else if (arguments.mcp()) {
       new McpServerRunner(database).run();
+    } else if (arguments.mcpHttp()) {
+      new McpServerRunner(database).runHttp(arguments.mcpBind(), arguments.mcpPort());
     } else if (arguments.interactive() || System.console() != null) {
       new InteractiveQueryShell(database, new QueryResultPrinter()).run();
     } else {
@@ -128,6 +130,9 @@ public final class MapsNdjsonViewerMain {
     output.println("  --interactive            open the SQL prompt, including inside an IDE");
     output.println("  -ui, --ui                open the DuckDB UI in the default browser");
     output.println("  --mcp                    expose the loaded DuckDB data as a stdio MCP server");
+    output.println("  --mcp-http               expose MCP over Streamable HTTP at /mcp");
+    output.println("  --bind <address>         HTTP bind address, default 127.0.0.1");
+    output.println("  --port <port>            HTTP port, default 8090");
     output.println("  --database <file>        persist imports or open an existing DuckDB database");
     output.println("  --format table|ndjson|csv|raw");
     output.println("  --raw                    emit a single selected column without a result envelope");

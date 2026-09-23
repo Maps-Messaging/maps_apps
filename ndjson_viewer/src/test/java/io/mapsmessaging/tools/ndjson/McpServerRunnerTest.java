@@ -75,6 +75,12 @@ class McpServerRunnerTest {
     }
   }
 
+  @Test
+  void includesExplicitBindAddressInAllowedHosts() {
+    assertTrue(McpServerRunner.allowedHttpHosts("192.0.2.10").contains("192.0.2.10"));
+    assertTrue(McpServerRunner.allowedHttpHosts("127.0.0.1").contains("localhost"));
+  }
+
   private String envelope(String topic, String payload) {
     String opaqueData =
         Base64.getEncoder().encodeToString(payload.getBytes(StandardCharsets.UTF_8));

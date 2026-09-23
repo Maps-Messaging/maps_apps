@@ -52,26 +52,46 @@ The UI is started from the same embedded DuckDB instance, so `raw_log`, `maps_lo
 
 ## MCP server
 
-Expose an existing DuckDB database to an MCP client over standard input/output:
+Expose an existing DuckDB database to a local MCP client over standard input/output:
 
 ```bash
 maps-ndjson-viewer --database telemetry.duckdb --mcp
 ```
 
-Or import logs first and expose the resulting in-memory DuckDB instance:
+Expose the same MCP tools over Streamable HTTP:
 
 ```bash
-maps-ndjson-viewer /var/log/maps-logger --mcp
+maps-ndjson-viewer --database telemetry.duckdb --mcp-http
 ```
 
-MCP mode exposes four tools:
+The default network endpoint is:
+
+```text
+http://127.0.0.1:8090/mcp
+```
+
+To accept remote connections on a trusted network:
+
+```bash
+maps-ndjson-viewer --database telemetry.duckdb --mcp-http --bind 0.0.0.0 --port 8090
+```
+
+Network mode does not add application authentication or TLS. Keep it on loopback unless access is protected by a firewall, VPN, SSH tunnel, or authenticated HTTPS reverse proxy.
+
+An input file or directory can be used instead of an existing database:
+
+```bash
+maps-ndjson-viewer /var/log/maps-logger --mcp-http
+```
+
+Both MCP transports expose the same four tools:
 
 - `list_relations` lists DuckDB tables and views.
 - `describe_relation` lists columns and DuckDB types.
 - `list_topics` lists all topics, or MAVLink topics only.
 - `query_sql` executes read-only DuckDB SQL.
 
-`query_sql` defaults to 200 rows and accepts at most 5,000 rows per call. MCP mode disables DuckDB external access so MCP SQL cannot read arbitrary local files or network resources. MCP JSON-RPC uses stdout; diagnostics remain on stderr.
+`query_sql` defaults to 200 rows and accepts at most 5,000 rows per call. MCP mode disables DuckDB external access so MCP SQL cannot read arbitrary local files or network resources.
 
 Run one query:
 
