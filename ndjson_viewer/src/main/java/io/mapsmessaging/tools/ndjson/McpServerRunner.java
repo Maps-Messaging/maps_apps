@@ -154,7 +154,7 @@ final class McpServerRunner {
             "MCP query_sql requires a statement that returns rows");
       }
       rowCount = new QueryResultPrinter()
-          .print(query.resultSet(), QueryOutputFormat.NDJSON, new PrintWriter(output));
+          .print(query.resultSet(), QueryOutputFormat.NDJSON, new PrintWriter(output), maxRows);
     }
 
     JsonArray rows = new JsonArray();
