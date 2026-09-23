@@ -67,6 +67,14 @@ final class DuckDbLogDatabase implements AutoCloseable {
     }
   }
 
+  long recordCount() throws SQLException {
+    try (Statement statement = connection.createStatement();
+         ResultSet resultSet = statement.executeQuery("SELECT count(*) FROM raw_log")) {
+      resultSet.next();
+      return resultSet.getLong(1);
+    }
+  }
+
   Query query(String sql) throws SQLException {
     return query(sql, 0);
   }

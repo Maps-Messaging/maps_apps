@@ -47,6 +47,21 @@ class DuckDbLogDatabaseTest {
   }
 
   @Test
+  void reportsLoadedRecordCount() throws Exception {
+    Path input = temporaryDirectory.resolve("maps.ndjson");
+    Files.writeString(
+        input,
+        envelope("4817/task", "{\"state\":\"ACTIVE\"}")
+            + envelope("mavlink/1/HEARTBEAT", "{\"mode\":\"AUTO\"}"));
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
+      database.load(List.of(input));
+
+      assertEquals(2, database.recordCount());
+    }
+  }
+
+  @Test
   void invalidBase64DoesNotAbortImport() throws Exception {
     Path input = temporaryDirectory.resolve("maps.ndjson");
     Files.writeString(input, "{\"topic\":\"mavlink/1/STATUSTEXT\",\"opaqueData\":\"not base64!\"}\n");
