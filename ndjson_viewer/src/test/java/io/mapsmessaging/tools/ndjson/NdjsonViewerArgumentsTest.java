@@ -121,4 +121,21 @@ class NdjsonViewerArgumentsTest {
             NdjsonViewerArguments.parse(
                 new String[] {"log.ndjson", "-ui", "--topics"}));
   }
+
+  @Test
+  void enablesMcpMode() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(new String[] {"--database", "analysis.duckdb", "--mcp"});
+
+    assertTrue(arguments.mcp());
+  }
+
+  @Test
+  void rejectsMcpWithAnotherOperation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            NdjsonViewerArguments.parse(
+                new String[] {"log.ndjson", "--mcp", "--topics"}));
+  }
 }

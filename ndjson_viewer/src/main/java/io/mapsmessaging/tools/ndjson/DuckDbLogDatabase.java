@@ -68,8 +68,19 @@ final class DuckDbLogDatabase implements AutoCloseable {
   }
 
   Query query(String sql) throws SQLException {
+    return query(sql, 0);
+  }
+
+  Query query(String sql, int maxRows) throws SQLException {
+    if (maxRows < 0) {
+      throw new IllegalArgumentException("maxRows must be zero or greater");
+    }
+
     Statement statement = connection.createStatement();
     try {
+      if (maxRows > 0) {
+        statement.setMaxRows(maxRows);
+      }
       boolean hasResultSet = statement.execute(sql);
       ResultSet resultSet = hasResultSet ? statement.getResultSet() : null;
       return new Query(statement, resultSet, statement.getLargeUpdateCount());

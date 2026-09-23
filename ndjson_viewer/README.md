@@ -50,6 +50,29 @@ maps-ndjson-viewer /var/log/maps-logger -ui
 
 The UI is started from the same embedded DuckDB instance, so `raw_log`, `maps_log`, `mavlink_log` and any persisted relations are immediately available. The viewer stays running while the UI is open; stop it with Ctrl-C.
 
+## MCP server
+
+Expose an existing DuckDB database to an MCP client over standard input/output:
+
+```bash
+maps-ndjson-viewer --database telemetry.duckdb --mcp
+```
+
+Or import logs first and expose the resulting in-memory DuckDB instance:
+
+```bash
+maps-ndjson-viewer /var/log/maps-logger --mcp
+```
+
+MCP mode exposes four tools:
+
+- `list_relations` lists DuckDB tables and views.
+- `describe_relation` lists columns and DuckDB types.
+- `list_topics` lists all topics, or MAVLink topics only.
+- `query_sql` executes read-only DuckDB SQL.
+
+`query_sql` defaults to 200 rows and accepts at most 5,000 rows per call. MCP mode disables DuckDB external access so MCP SQL cannot read arbitrary local files or network resources. MCP JSON-RPC uses stdout; diagnostics remain on stderr.
+
 Run one query:
 
 ```bash

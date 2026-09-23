@@ -70,6 +70,8 @@ public final class MapsNdjsonViewerMain {
       execute(database, arguments.sql(), arguments);
     } else if (arguments.ui()) {
       runUi(database);
+    } else if (arguments.mcp()) {
+      new McpServerRunner(database).run();
     } else if (arguments.interactive() || System.console() != null) {
       new InteractiveQueryShell(database, new QueryResultPrinter()).run();
     } else {
@@ -125,6 +127,7 @@ public final class MapsNdjsonViewerMain {
     output.println("  --sql <query>            execute SQL against maps_log or mavlink_log");
     output.println("  --interactive            open the SQL prompt, including inside an IDE");
     output.println("  -ui, --ui                open the DuckDB UI in the default browser");
+    output.println("  --mcp                    expose the loaded DuckDB data as a stdio MCP server");
     output.println("  --database <file>        persist imports or open an existing DuckDB database");
     output.println("  --format table|ndjson|csv|raw");
     output.println("  --raw                    emit a single selected column without a result envelope");
