@@ -14,7 +14,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Locale;
-import java.util.OptionalLong;
 
 final class DuckDbLogDatabase implements AutoCloseable {
 
@@ -68,27 +67,54 @@ final class DuckDbLogDatabase implements AutoCloseable {
     }
   }
 
-  OptionalLong recordCount() throws SQLException {
-    for (String relation : List.of("raw_log", "maps_log")) {
-      if (relationExists(relation)) {
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery("SELECT count(*) FROM " + relation)) {
-          resultSet.next();
-          return OptionalLong.of(resultSet.getLong(1));
-        }
-      }
-    }
-    return OptionalLong.empty();
-  }
-
-  private boolean relationExists(String relation) throws SQLException {
+  DatabaseSummary databaseSummary() throws SQLException {
+    List<TableName> tables = new java.util.ArrayList<>();
     try (Statement statement = connection.createStatement();
          ResultSet resultSet = statement.executeQuery(
-             "SELECT 1 FROM information_schema.tables "
-                 + "WHERE table_schema NOT IN ('information_schema', 'pg_catalog') "
-                 + "AND table_name = '" + relation.replace("'", "''") + "' LIMIT 1")) {
-      return resultSet.next();
+             "SELECT table_catalog, table_schema, table_name "
+                 + "FROM information_schema.tables "
+                 + "WHERE table_type = 'BASE TABLE' "
+                 + "AND table_schema NOT IN ('information_schema', 'pg_catalog') "
+                 + "ORDER BY table_catalog, table_schema, table_name")) {
+      while (resultSet.next()) {
+        tables.add(
+            new TableName(
+                resultSet.getString("table_catalog"),
+                resultSet.getString("table_schema"),
+                resultSet.getString("table_name")));
+      }
     }
+
+    long records = 0;
+    for (TableName table : tables) {
+      String qualifiedName =
+          quoteIdentifier(table.catalog())
+              + "."
+              + quoteIdentifier(table.schema())
+              + "."
+              + quoteIdentifier(table.name());
+      try (Statement statement = connection.createStatement();
+           ResultSet resultSet = statement.executeQuery("SELECT count(*) FROM " + qualifiedName)) {
+        resultSet.next();
+        records += resultSet.getLong(1);
+      }
+    }
+    List<String> names = tables.stream()
+        .map(TableName::displayName)
+        .toList();
+    return new DatabaseSummary(tables.size(), records, names);
+  }
+
+  record DatabaseSummary(int tableCount, long recordCount, List<String> tableNames) {}
+
+  private record TableName(String catalog, String schema, String name) {
+    String displayName() {
+      return "main".equalsIgnoreCase(schema) ? name : schema + "." + name;
+    }
+  }
+
+  private String quoteIdentifier(String value) {
+    return "\"" + value.replace("\"", "\"\"") + "\"";
   }
 
   Query query(String sql) throws SQLException {

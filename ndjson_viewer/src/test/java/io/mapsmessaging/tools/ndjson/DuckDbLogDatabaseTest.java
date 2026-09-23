@@ -57,27 +57,41 @@ class DuckDbLogDatabaseTest {
     try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
       database.load(List.of(input));
 
-      assertEquals(2, database.recordCount().orElseThrow());
+      var summary = database.databaseSummary();
+      assertEquals(1, summary.tableCount());
+      assertEquals(2, summary.recordCount());
     }
   }
 
   @Test
-  void fallsBackToMapsLogForExistingDatabaseRecordCount() throws Exception {
-    Path databasePath = temporaryDirectory.resolve("maps-only.duckdb");
+  void reportsRecordsAcrossArbitraryBaseTables() throws Exception {
+    Path databasePath = temporaryDirectory.resolve("arbitrary.duckdb");
 
     try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
-      executeStatement(database, "CREATE TABLE maps_log AS SELECT 1 AS value UNION ALL SELECT 2");
-      assertEquals(2, database.recordCount().orElseThrow());
+      executeStatement(database, "CREATE TABLE alpha AS SELECT 1 AS value UNION ALL SELECT 2");
+      executeStatement(database, "CREATE TABLE beta AS SELECT 3 AS value");
+      executeStatement(database, "CREATE VIEW combined AS SELECT * FROM alpha UNION ALL SELECT * FROM beta");
+
+      var summary = database.databaseSummary();
+      assertEquals(2, summary.tableCount());
+      assertEquals(3, summary.recordCount());
+      assertTrue(summary.tableNames().contains("alpha"));
+      assertTrue(summary.tableNames().contains("beta"));
+      assertFalse(summary.tableNames().contains("combined"));
     }
   }
 
   @Test
-  void returnsEmptyRecordCountWhenNoMapsLogRelationExists() throws Exception {
-    Path databasePath = temporaryDirectory.resolve("other.duckdb");
+  void reportsZeroForDatabaseWithoutBaseTables() throws Exception {
+    Path databasePath = temporaryDirectory.resolve("views-only.duckdb");
 
     try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
-      executeStatement(database, "CREATE TABLE other_table AS SELECT 1 AS value");
-      assertTrue(database.recordCount().isEmpty());
+      executeStatement(database, "CREATE VIEW only_view AS SELECT 1 AS value");
+
+      var summary = database.databaseSummary();
+      assertEquals(0, summary.tableCount());
+      assertEquals(0, summary.recordCount());
+      assertTrue(summary.tableNames().isEmpty());
     }
   }
 
