@@ -50,10 +50,17 @@ public final class MapsNdjsonViewerMain {
           throw new IllegalArgumentException("DuckDB database does not exist: " + databasePath);
         }
         try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
-          System.err.printf(
-              "Opened DuckDB database %s with %,d record(s)%n",
-              databasePath,
-              database.recordCount());
+          var recordCount = database.recordCount();
+          if (recordCount.isPresent()) {
+            System.err.printf(
+                "Opened DuckDB database %s with %,d record(s)%n",
+                databasePath,
+                recordCount.getAsLong());
+          } else {
+            System.err.printf(
+                "Opened DuckDB database %s; no raw_log or maps_log relation found%n",
+                databasePath);
+          }
           inspect(database, arguments);
         }
       }

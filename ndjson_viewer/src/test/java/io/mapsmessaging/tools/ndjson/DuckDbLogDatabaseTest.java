@@ -57,7 +57,27 @@ class DuckDbLogDatabaseTest {
     try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
       database.load(List.of(input));
 
-      assertEquals(2, database.recordCount());
+      assertEquals(2, database.recordCount().orElseThrow());
+    }
+  }
+
+  @Test
+  void fallsBackToMapsLogForExistingDatabaseRecordCount() throws Exception {
+    Path databasePath = temporaryDirectory.resolve("maps-only.duckdb");
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
+      executeStatement(database, "CREATE TABLE maps_log AS SELECT 1 AS value UNION ALL SELECT 2");
+      assertEquals(2, database.recordCount().orElseThrow());
+    }
+  }
+
+  @Test
+  void returnsEmptyRecordCountWhenNoMapsLogRelationExists() throws Exception {
+    Path databasePath = temporaryDirectory.resolve("other.duckdb");
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
+      executeStatement(database, "CREATE TABLE other_table AS SELECT 1 AS value");
+      assertTrue(database.recordCount().isEmpty());
     }
   }
 

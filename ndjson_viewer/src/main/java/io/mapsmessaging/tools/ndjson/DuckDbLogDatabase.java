@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Locale;
+import java.util.OptionalLong;
 
 final class DuckDbLogDatabase implements AutoCloseable {
 
@@ -67,11 +68,26 @@ final class DuckDbLogDatabase implements AutoCloseable {
     }
   }
 
-  long recordCount() throws SQLException {
+  OptionalLong recordCount() throws SQLException {
+    for (String relation : List.of("raw_log", "maps_log")) {
+      if (relationExists(relation)) {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT count(*) FROM " + relation)) {
+          resultSet.next();
+          return OptionalLong.of(resultSet.getLong(1));
+        }
+      }
+    }
+    return OptionalLong.empty();
+  }
+
+  private boolean relationExists(String relation) throws SQLException {
     try (Statement statement = connection.createStatement();
-         ResultSet resultSet = statement.executeQuery("SELECT count(*) FROM raw_log")) {
-      resultSet.next();
-      return resultSet.getLong(1);
+         ResultSet resultSet = statement.executeQuery(
+             "SELECT 1 FROM information_schema.tables "
+                 + "WHERE table_schema NOT IN ('information_schema', 'pg_catalog') "
+                 + "AND table_name = '" + relation.replace("'", "''") + "' LIMIT 1")) {
+      return resultSet.next();
     }
   }
 
