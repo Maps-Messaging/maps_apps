@@ -458,13 +458,17 @@ public final class InstanceManager implements AutoCloseable {
 
     ensureDockerNetwork(instance.network());
 
+    boolean appendContainerCommand =
+        instance.containerCommand().isEmpty() || dockerImageHasEntrypoint(instance.image());
+
     List<String> command =
         DockerCommandBuilder.runCommand(
             config.dockerCommand(),
             containerName,
             instance,
             paths.configDir(),
-            paths.dataDir());
+            paths.dataDir(),
+            appendContainerCommand);
 
     CommandResult result = runCommand(command, Duration.ofSeconds(60));
     if (result.exitCode() != 0) {
@@ -472,6 +476,25 @@ public final class InstanceManager implements AutoCloseable {
     }
 
     return status(name);
+  }
+
+  private boolean dockerImageHasEntrypoint(String image) throws IOException {
+    CommandResult inspect =
+        runCommand(
+            List.of(
+                config.dockerCommand(),
+                "image",
+                "inspect",
+                "-f",
+                "{{json .Config.Entrypoint}}",
+                image),
+            Duration.ofSeconds(10));
+    if (inspect.exitCode() != 0) {
+      throw new IOException("Unable to inspect Docker image " + image + ": " + inspect.output());
+    }
+
+    String entrypoint = inspect.output().trim();
+    return !entrypoint.isBlank() && !entrypoint.equals("null") && !entrypoint.equals("[]");
   }
 
   private void ensureDockerNetwork(String network) throws IOException {
