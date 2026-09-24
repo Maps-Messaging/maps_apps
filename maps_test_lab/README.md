@@ -22,17 +22,9 @@ When the script is run through `sudo`, it configures Docker access for the invok
 MAPS_TEST_LAB_USER=matthew ./maps_test_lab/scripts/bootstrap-ubuntu-24.04.sh
 ```
 
-The bootstrap installs:
+The bootstrap installs OpenJDK 21, Maven, Git, Docker Engine from Docker's official Ubuntu repository, Docker Buildx and Compose, Mosquitto MQTT clients, and common diagnostic tools including `jq`, `rsync`, `tcpdump`, `iproute2`, `procps`, `zip` and `unzip`.
 
-- OpenJDK 21;
-- Maven and Git;
-- Docker Engine from Docker's official Ubuntu repository;
-- Docker Buildx and Compose plugins;
-- Mosquitto MQTT command-line clients;
-- `jq`, `rsync`, `tcpdump`, `iproute2`, `procps`, `zip` and `unzip`;
-- the `/srv/maps-test-lab` workspace.
-
-It enables the Docker daemon but does not install, start or register MAPS Test Lab itself. Log out and back in after bootstrap so Docker group membership takes effect.
+It also creates `/srv/maps-test-lab`. It enables Docker but does not install, start or register MAPS Test Lab itself. Log out and back in after bootstrap so Docker group membership takes effect.
 
 Membership of the `docker` group effectively grants root-level control of this dedicated test server. Do not add general-purpose or untrusted users to it.
 
@@ -46,65 +38,145 @@ mvn clean verify
 
 The shaded JAR is created under `maps_test_lab/target`.
 
-## Configuration
+## Docker configuration
 
-Create a JSON configuration such as:
+Docker is the preferred provider for multi-server test topologies.
+
+Example two-server lab:
 
 ```json
 {
   "root": "/srv/maps-test-lab",
   "bindAddress": "127.0.0.1",
   "port": 8091,
+  "dockerCommand": "docker",
   "mqttPubCommand": "mosquitto_pub",
   "mqttSubCommand": "mosquitto_sub",
   "instances": {
-    "drone": {
-      "command": [
-        "java",
-        "-jar",
-        "/opt/maps/maps.jar",
-        "--config",
-        "${configDir}"
+    "ralf-a": {
+      "provider": "docker",
+      "image": "mapsmessaging/server:test",
+      "network": "ralf-lab",
+      "ports": [
+        "18831:1883"
       ],
-      "environment": {},
       "mqttHost": "127.0.0.1",
-      "mqttPort": 18831
+      "mqttPort": 18831,
+      "debugPort": 5005,
+      "debugSuspend": false,
+      "environment": {},
+      "containerCommand": [
+        "--config",
+        "/opt/maps/config"
+      ]
     },
-    "central": {
-      "command": [
-        "java",
-        "-jar",
-        "/opt/maps/maps.jar",
-        "--config",
-        "${configDir}"
+    "ralf-b": {
+      "provider": "docker",
+      "image": "mapsmessaging/server:test",
+      "network": "ralf-lab",
+      "ports": [
+        "18832:1883"
       ],
-      "environment": {},
       "mqttHost": "127.0.0.1",
-      "mqttPort": 18832
+      "mqttPort": 18832,
+      "debugPort": 5006,
+      "debugSuspend": false,
+      "environment": {},
+      "containerCommand": [
+        "--config",
+        "/opt/maps/config"
+      ]
     }
   }
 }
 ```
+
+The lab creates the named Docker network when necessary and mounts:
+
+```text
+<instance>/config -> /opt/maps/config
+<instance>/data   -> /opt/maps_data
+```
+
+Additional application ports can be supplied through `ports` using normal Docker `host:container` notation.
+
+The image and `containerCommand` are intentionally configurable. The test lab does not assume a particular MapsMessaging image layout.
+
+## IntelliJ remote debugging
+
+Set `debugPort` on a Docker instance to enable JDWP. The lab publishes the same host/container port and adds the equivalent of:
+
+```text
+-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+```
+
+through `JAVA_TOOL_OPTIONS`.
+
+Set `debugSuspend: true` when the Maps JVM should wait for the debugger before continuing.
+
+In IntelliJ IDEA create a **Remote JVM Debug** configuration and use:
+
+```text
+Host: <test-server-address>
+Port: 5005
+```
+
+Use the configured port for the target instance, for example `5006` for `ralf-b`.
+
+JDWP has no meaningful authentication. Expose debug ports only on the isolated test network or restrict them with the host firewall/SSH tunnelling. Humanity has already produced enough unauthenticated management ports.
+
+## Process provider
+
+The original process provider remains available for tests that do not need Docker:
+
+```json
+{
+  "instances": {
+    "local": {
+      "provider": "process",
+      "command": [
+        "java",
+        "-jar",
+        "/opt/maps/maps.jar",
+        "--config",
+        "${configDir}"
+      ],
+      "mqttHost": "127.0.0.1",
+      "mqttPort": 1883
+    }
+  }
+}
+```
+
+Process commands may use `${instance}`, `${instanceDir}`, `${configDir}`, `${dataDir}` and `${logFile}` placeholders.
+
+## Instance workspace
 
 Each instance receives its own workspace:
 
 ```text
 /srv/maps-test-lab/
   instances/
-    drone/
+    ralf-a/
       config/
       data/
       logs/
-    central/
+    ralf-b/
       config/
       data/
       logs/
   evidence/
 ```
 
-The command may use `${instance}`, `${instanceDir}`, `${configDir}`, `${dataDir}` and `${logFile}` placeholders.
+## Supplying configurations through MCP
 
-Populate each instance's `config` directory before starting it. The lab does not generate MapsMessaging configuration because test topology is deliberately explicit.
+The `write_instance_config` tool creates files only below an instance's `config` directory.
+
+It accepts UTF-8 text by default and Base64 for binary configuration resources. Existing files are preserved unless `overwrite: true` is explicitly supplied.
+
+This allows a supplied server configuration to be recreated without granting the MCP caller arbitrary filesystem access.
+
+`instance_config` lists or reads configuration files for verification.
 
 ## Run
 
@@ -118,7 +190,7 @@ The MCP endpoint is:
 http://127.0.0.1:8091/mcp
 ```
 
-Bind to a non-loopback address only on an isolated test network. The server can start and stop processes and can publish arbitrary MQTT payloads to configured test brokers, so exposing it to an operational network would be a creative but poor security experiment.
+Bind to a non-loopback address only on an isolated test network. The server can start and stop processes/containers and publish arbitrary MQTT payloads to configured test brokers.
 
 ## MCP tools
 
@@ -128,33 +200,53 @@ Bind to a non-loopback address only on an isolated test network. The server can 
 - `restart_instance`
 - `instance_status`
 - `instance_logs`
+- `list_log_files`
+- `read_log`
 - `instance_config`
+- `write_instance_config`
 - `mqtt_publish`
 - `mqtt_subscribe`
 - `create_evidence`
+- `create_evidence_archive`
 
-Process commands are taken only from the lab configuration. MCP callers cannot supply arbitrary executable commands.
+MCP callers cannot supply arbitrary executable commands. Process commands, Docker images, networks and container commands come from `lab.json`.
 
-`instance_config` is restricted to the instance configuration directory and rejects path traversal.
+MQTT operations use `mosquitto_pub` and `mosquitto_sub` by default.
 
-MQTT operations use `mosquitto_pub` and `mosquitto_sub` by default. Override their command paths in `lab.json` if required.
+## Logs and analysis
 
-## Evidence
+`instance_logs` returns a bounded tail of the current process or Docker stdout/stderr.
 
-`create_evidence` creates a timestamped directory below `evidence/` containing the instance config, logs and a JSON manifest with process state. This is intended to preserve a failed run before restarting or changing configuration.
+`list_log_files` lists persisted files under the instance `logs` directory.
 
-## Initial bridge-recovery workflow
+`read_log` reads a bounded chunk of a selected log file using byte offsets. Responses include `nextOffset` and `eof`, allowing large logs to be analysed incrementally without stuffing hundreds of megabytes into one MCP response.
 
-A useful first scenario is:
+For Docker instances, Docker stdout/stderr is captured into `logs/docker.log` when evidence or persisted-log operations are requested.
 
-1. start `central`;
-2. start `drone`;
-3. publish a unique test payload to the drone broker;
-4. subscribe for it on central;
-5. restart central;
-6. repeat the publish/subscribe check;
-7. restart drone;
-8. repeat the check;
-9. capture evidence if any stage fails.
+## Evidence and download bundles
 
-Higher-level scenario orchestration can be layered on top of these MCP primitives without adding unrestricted shell execution to the MCP surface.
+`create_evidence` creates a timestamped directory containing:
+
+- the instance configuration;
+- available persisted logs;
+- Docker stdout/stderr where applicable;
+- a JSON status manifest.
+
+`create_evidence_archive` additionally creates a ZIP in `/srv/maps-test-lab/evidence` and returns its server path and size. The ZIP can then be copied from the isolated host using the operator's normal SSH/SCP/rsync mechanism.
+
+## Example supplied-config workflow
+
+Given two real MapsMessaging configurations, an MCP client can:
+
+1. write the first configuration into `ralf-a/config`;
+2. write the second configuration into `ralf-b/config`;
+3. start both Docker instances;
+4. verify process/container and bridge state from logs;
+5. publish a controlled MQTT message into the first server;
+6. verify delivery from the second server;
+7. restart either server;
+8. repeat the delivery check;
+9. inspect logs incrementally;
+10. create an evidence ZIP when a failure occurs.
+
+The same model scales to longer chains by declaring additional Docker instances on the test network.
