@@ -24,6 +24,23 @@ final class DockerCommandBuilder {
         configDir.toString());
   }
 
+  static List<String> workspaceCleanupCommand(
+      String dockerCommand, String image, Path instanceDir) {
+    return List.of(
+        dockerCommand,
+        "run",
+        "--rm",
+        "-u",
+        "0",
+        "-v",
+        instanceDir + ":/workspace",
+        "--entrypoint",
+        "/bin/sh",
+        image,
+        "-c",
+        "rm -rf /workspace/config /workspace/data /workspace/logs");
+  }
+
   static List<String> dataOwnershipCommand(
       String dockerCommand, String image, Path dataDir) {
     return List.of(
