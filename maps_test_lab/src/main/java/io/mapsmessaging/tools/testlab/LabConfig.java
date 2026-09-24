@@ -44,6 +44,16 @@ public record LabConfig(
     }
   }
 
+  public LabConfig(
+      Path root,
+      String bindAddress,
+      int port,
+      String mqttPubCommand,
+      String mqttSubCommand,
+      Map<String, InstanceConfig> instances) {
+    this(root, bindAddress, port, "docker", mqttPubCommand, mqttSubCommand, instances);
+  }
+
   public static LabConfig load(Path configFile) throws IOException {
     Path absolute = configFile.toAbsolutePath().normalize();
     try (Reader reader = Files.newBufferedReader(absolute)) {
