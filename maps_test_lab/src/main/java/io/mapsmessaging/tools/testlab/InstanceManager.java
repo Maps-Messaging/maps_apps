@@ -69,6 +69,20 @@ public final class InstanceManager implements AutoCloseable {
 
     Process process = builder.start();
     processes.put(name, process);
+
+    try {
+      if (process.waitFor(250, TimeUnit.MILLISECONDS)) {
+        processes.remove(name);
+        throw new IOException(
+            "Instance " + name + " exited during startup with code " + process.exitValue());
+      }
+    } catch (InterruptedException exception) {
+      process.destroyForcibly();
+      processes.remove(name);
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while starting instance " + name, exception);
+    }
+
     return status(name);
   }
 
@@ -297,15 +311,6 @@ public final class InstanceManager implements AutoCloseable {
 
   private CommandResult runCommand(List<String> command, Duration timeout) throws IOException {
     Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-    String output;
-    try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-      StringBuilder buffer = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-        buffer.append(line).append(System.lineSeparator());
-      }
-      output = buffer.toString();
-    }
 
     try {
       if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
@@ -318,6 +323,8 @@ public final class InstanceManager implements AutoCloseable {
       throw new IOException("Command interrupted", exception);
     }
 
+    String output =
+        new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
     return new CommandResult(process.exitValue(), output);
   }
 
