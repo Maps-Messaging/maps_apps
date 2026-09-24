@@ -24,6 +24,23 @@ final class DockerCommandBuilder {
         configDir.toString());
   }
 
+  static List<String> dataOwnershipCommand(
+      String dockerCommand, String image, Path dataDir) {
+    return List.of(
+        dockerCommand,
+        "run",
+        "--rm",
+        "-u",
+        "0",
+        "-v",
+        dataDir + ":/opt/maps_data",
+        "--entrypoint",
+        "/bin/sh",
+        image,
+        "-c",
+        "chown messaginguser:messaginggroup /opt/maps_data");
+  }
+
   static List<String> runCommand(
       String dockerCommand,
       String containerName,
