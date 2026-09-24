@@ -92,6 +92,11 @@ RUN set -eux; \
     mv "/maps-${VERSION}" /opt/maps; \
     chmod +x /opt/maps/bin/startDocker.sh; \
     dos2unix /opt/maps/bin/startDocker.sh; \
+    sed -i "s/%%MAPS_VERSION%%/${VERSION}/g" /opt/maps/bin/startDocker.sh; \
+    if grep -q "%%MAPS_VERSION%%" /opt/maps/bin/startDocker.sh; then \
+      echo "Unresolved MAPS version placeholder remains in startDocker.sh" >&2; \
+      exit 1; \
+    fi; \
     if [ -f /opt/maps/conf/docker_logback.xml ]; then \
       mv /opt/maps/conf/logback.xml /opt/maps/conf/logback.xml_orig; \
       mv /opt/maps/conf/docker_logback.xml /opt/maps/conf/logback.xml; \
