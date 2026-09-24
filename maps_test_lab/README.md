@@ -58,6 +58,44 @@ mvn clean verify
 
 The shaded JAR is created under `maps_test_lab/target`.
 
+## Build a native MapsMessaging Docker image from source
+
+If the published Docker image does not support the test host architecture, build a host-native image from the MapsMessaging source tree:
+
+```bash
+./maps_test_lab/scripts/build-maps-docker-image.sh
+```
+
+By default the script:
+
+- clones or updates `Maps-Messaging/mapsmessaging_server`;
+- uses the `development` branch;
+- runs `mvn clean install -DskipTests`;
+- consumes the locally built `target/maps-<version>-install.tar.gz`;
+- builds a Docker image matching the host architecture;
+- tags it as `mapsmessaging/server_daemon_local:latest`.
+
+On ARM64 the image is built as `linux/arm64`; on x86-64 it is built as `linux/amd64`.
+
+Useful overrides:
+
+```bash
+MAPS_SERVER_BRANCH=development \
+MAPS_DOCKER_IMAGE=mapsmessaging/server_daemon_local \
+MAPS_BUILD_TESTS=false \
+./maps_test_lab/scripts/build-maps-docker-image.sh
+```
+
+Set `MAPS_BUILD_TESTS=true` when the server Maven tests should run before the image is built.
+
+After it completes, configure Docker instances with:
+
+```json
+"image": "mapsmessaging/server_daemon_local:latest"
+```
+
+This image is built from the local Maven output. It does not depend on the architecture coverage of the published Docker Hub image.
+
 ## Docker configuration
 
 Docker is the preferred provider for multi-server test topologies.
