@@ -140,6 +140,14 @@ public record LabConfig(
       debugPort = debugPort < 0 ? 0 : debugPort;
     }
 
+    public InstanceConfig(
+        List<String> command,
+        Map<String, String> environment,
+        String mqttHost,
+        int mqttPort) {
+      this("process", command, environment, mqttHost, mqttPort, "", "", List.of(), List.of(), 0, false);
+    }
+
     public static InstanceConfig process(
         List<String> command, Map<String, String> environment, String mqttHost, int mqttPort) {
       return new InstanceConfig(
