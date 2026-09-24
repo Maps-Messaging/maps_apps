@@ -8,6 +8,34 @@ This module is built and tested by the normal Maven reactor, but it is deliberat
 
 Run it manually from the build output only.
 
+## Ubuntu 24.04 test host bootstrap
+
+For a fresh Ubuntu 24.04 Server host, run:
+
+```bash
+sudo ./maps_test_lab/scripts/bootstrap-ubuntu-24.04.sh
+```
+
+When the script is run through `sudo`, it configures Docker access for the invoking user. When running directly as root, specify the intended operator account:
+
+```bash
+MAPS_TEST_LAB_USER=matthew ./maps_test_lab/scripts/bootstrap-ubuntu-24.04.sh
+```
+
+The bootstrap installs:
+
+- OpenJDK 21;
+- Maven and Git;
+- Docker Engine from Docker's official Ubuntu repository;
+- Docker Buildx and Compose plugins;
+- Mosquitto MQTT command-line clients;
+- `jq`, `rsync`, `tcpdump`, `iproute2`, `procps`, `zip` and `unzip`;
+- the `/srv/maps-test-lab` workspace.
+
+It enables the Docker daemon but does not install, start or register MAPS Test Lab itself. Log out and back in after bootstrap so Docker group membership takes effect.
+
+Membership of the `docker` group effectively grants root-level control of this dedicated test server. Do not add general-purpose or untrusted users to it.
+
 ## Build
 
 From the repository root:
