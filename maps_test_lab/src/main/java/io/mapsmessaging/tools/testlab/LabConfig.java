@@ -76,7 +76,9 @@ public record LabConfig(
                         instance.image,
                         instance.network,
                         instance.containerCommand,
-                        instance.ports)));
+                        instance.ports,
+                        instance.debugPort,
+                        instance.debugSuspend)));
       }
 
       return new LabConfig(
@@ -118,7 +120,9 @@ public record LabConfig(
       String image,
       String network,
       List<String> containerCommand,
-      List<String> ports) {
+      List<String> ports,
+      int debugPort,
+      boolean debugSuspend) {
 
     public InstanceConfig {
       provider = blankDefault(provider, "process").toLowerCase();
@@ -133,12 +137,13 @@ public record LabConfig(
       network = network == null ? "" : network;
       containerCommand = containerCommand == null ? List.of() : List.copyOf(containerCommand);
       ports = ports == null ? List.of() : List.copyOf(ports);
+      debugPort = debugPort < 0 ? 0 : debugPort;
     }
 
     public static InstanceConfig process(
         List<String> command, Map<String, String> environment, String mqttHost, int mqttPort) {
       return new InstanceConfig(
-          "process", command, environment, mqttHost, mqttPort, "", "", List.of(), List.of());
+          "process", command, environment, mqttHost, mqttPort, "", "", List.of(), List.of(), 0, false);
     }
 
     public static InstanceConfig docker(
@@ -148,7 +153,9 @@ public record LabConfig(
         List<String> ports,
         Map<String, String> environment,
         String mqttHost,
-        int mqttPort) {
+        int mqttPort,
+        int debugPort,
+        boolean debugSuspend) {
       return new InstanceConfig(
           "docker",
           List.of(),
@@ -158,7 +165,9 @@ public record LabConfig(
           image,
           network,
           containerCommand,
-          ports);
+          ports,
+          debugPort,
+          debugSuspend);
     }
   }
 
@@ -182,5 +191,7 @@ public record LabConfig(
     String network;
     List<String> containerCommand;
     List<String> ports;
+    int debugPort;
+    boolean debugSuspend;
   }
 }
