@@ -8,7 +8,8 @@ INSTALL_DIR="/opt/maps/apps"
 OUTPUT_DIR="${ROOT_DIR}/packaging/output"
 WORK_DIR="${ROOT_DIR}/packaging/work"
 
-LOGGER_MODULE="mqtt_logger"\nDEVELOPER_ONLY_MODULES=("maps_test_lab")
+LOGGER_MODULE="mqtt_logger"
+DEVELOPER_ONLY_MODULES=("maps_test_lab")
 LOGGER_INSTALL_SOURCE="${ROOT_DIR}/${LOGGER_MODULE}/install"
 LOGGER_SYSTEMD_SOURCE="${LOGGER_INSTALL_SOURCE}/systemd"
 LOGGER_CONFIG_DIR="/etc/maps-logger"
