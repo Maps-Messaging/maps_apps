@@ -84,6 +84,23 @@ class DockerCommandBuilderTest {
   }
 
   @Test
+  void buildsDataOwnershipCommandUsingImageUserNames() {
+    List<String> command =
+        DockerCommandBuilder.dataOwnershipCommand(
+            "docker",
+            "mapsmessaging/server_daemon_local:latest",
+            Path.of("/srv/maps-test-lab/instances/maps-a/data"));
+
+    assertTrue(command.contains("--rm"));
+    assertTrue(command.contains("-u"));
+    assertTrue(command.contains("0"));
+    assertTrue(command.contains("/srv/maps-test-lab/instances/maps-a/data:/opt/maps_data"));
+    assertTrue(command.contains("--entrypoint"));
+    assertTrue(command.contains("/bin/sh"));
+    assertTrue(command.contains("chown messaginguser:messaginggroup /opt/maps_data"));
+  }
+
+  @Test
   void buildsConfigurationSeedCommandsForMapsConf() {
     List<String> create =
         DockerCommandBuilder.seedCreateCommand(
