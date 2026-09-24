@@ -91,6 +91,39 @@ public final class InstanceManager implements AutoCloseable {
     return start(name);
   }
 
+  public synchronized Map<String, Object> delete(String name) throws IOException {
+    LabConfig.InstanceConfig instance = config.requireInstance(name);
+    stop(name);
+
+    if (instance.provider().equals("docker")) {
+      CommandResult remove =
+          runCommand(
+              List.of(config.dockerCommand(), "rm", "-f", dockerContainerName(name)),
+              Duration.ofSeconds(15));
+      if (remove.exitCode() != 0 && !remove.output().contains("No such container")) {
+        throw new IOException(
+            "Unable to remove Docker container for " + name + ": " + remove.output());
+      }
+    } else {
+      processes.remove(name);
+    }
+
+    Path instanceDir = paths(name).instanceDir();
+    deleteTree(instanceDir);
+
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("name", name);
+    result.put("provider", instance.provider());
+    result.put("deleted", true);
+    result.put("instanceDir", instanceDir.toString());
+    if (instance.provider().equals("docker")) {
+      result.put("container", dockerContainerName(name));
+      result.put("image", instance.image());
+      result.put("imageDeleted", false);
+    }
+    return result;
+  }
+
   public Map<String, Object> status(String name) {
     LabConfig.InstanceConfig instance = config.requireInstance(name);
     Paths paths = paths(name);
@@ -687,6 +720,18 @@ public final class InstanceManager implements AutoCloseable {
     response.put("exitCode", result.exitCode());
     response.put("output", result.output());
     return response;
+  }
+
+  private void deleteTree(Path root) throws IOException {
+    if (!Files.exists(root)) {
+      return;
+    }
+
+    try (var stream = Files.walk(root)) {
+      for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
+        Files.deleteIfExists(path);
+      }
+    }
   }
 
   private void copyTree(Path source, Path destination) throws IOException {
