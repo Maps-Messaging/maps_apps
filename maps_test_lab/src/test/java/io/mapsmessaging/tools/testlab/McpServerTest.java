@@ -68,6 +68,7 @@ class McpServerTest {
 
       assertEquals(200, tools.statusCode());
       assertTrue(tools.body().contains("\"start_instance\""));
+      assertTrue(tools.body().contains("\"delete_instance\""));
       assertTrue(tools.body().contains("\"mqtt_publish\""));
       assertTrue(tools.body().contains("\"create_evidence\""));
       assertTrue(tools.body().contains("\"write_instance_config\""));
