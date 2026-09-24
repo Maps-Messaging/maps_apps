@@ -2,7 +2,11 @@
 
 The `maps-apps` Debian package contains deployable JARs from package-enabled Maven modules declared in the root `pom.xml`. Developer-only modules are explicitly excluded by the packaging script.
 
-## Developer-only exclusions\n\n`maps_test_lab` is built and tested by Maven but is deliberately not installed by the Debian package. It has no package launcher or systemd unit and is never enabled or started by package installation.\n\n## Installed files
+## Developer-only exclusions
+
+`maps_test_lab` is built and tested by Maven but is deliberately not installed by the Debian package. It has no package launcher or systemd unit and is never enabled or started by package installation.
+
+## Installed files
 
 Application JARs are installed under:
 
