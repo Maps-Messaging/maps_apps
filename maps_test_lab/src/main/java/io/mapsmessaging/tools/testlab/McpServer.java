@@ -14,7 +14,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;
 
 public final class McpServer implements AutoCloseable {
 
@@ -28,7 +28,8 @@ public final class McpServer implements AutoCloseable {
     this.manager = manager;
     server = HttpServer.create(new InetSocketAddress(config.bindAddress(), config.port()), 0);
     server.createContext("/mcp", this::handle);
-    server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+    executor = Executors.newVirtualThreadPerTaskExecutor();
+    server.setExecutor(executor);
   }
 
   public void start() {
@@ -42,6 +43,7 @@ public final class McpServer implements AutoCloseable {
   @Override
   public void close() {
     server.stop(0);
+    executor.close();
   }
 
   private void handle(HttpExchange exchange) throws IOException {
@@ -97,7 +99,11 @@ public final class McpServer implements AutoCloseable {
 
   private JsonObject toolList() {
     JsonArray tools = new JsonArray();
-    tools.add(tool("list_instances", "List configured MapsMessaging test instances", Map.of()));
+    tools.add(
+        tool(
+            "list_instances",
+            "List configured MapsMessaging test instances",
+            properties(Map.of())));
     tools.add(tool("start_instance", "Start one configured MapsMessaging instance", stringArgs("name")));
     tools.add(tool("stop_instance", "Stop one managed MapsMessaging instance", stringArgs("name")));
     tools.add(tool("restart_instance", "Restart one managed MapsMessaging instance", stringArgs("name")));
