@@ -84,6 +84,21 @@ class DockerCommandBuilderTest {
   }
 
   @Test
+  void buildsRootWorkspaceCleanupCommand() {
+    List<String> command =
+        DockerCommandBuilder.workspaceCleanupCommand(
+            "docker",
+            "mapsmessaging/server_daemon_local:latest",
+            Path.of("/srv/maps-test-lab/instances/maps-a"));
+
+    assertTrue(command.contains("--rm"));
+    assertTrue(command.contains("-u"));
+    assertTrue(command.contains("0"));
+    assertTrue(command.contains("/srv/maps-test-lab/instances/maps-a:/workspace"));
+    assertTrue(command.contains("rm -rf /workspace/config /workspace/data /workspace/logs"));
+  }
+
+  @Test
   void buildsDataOwnershipCommandUsingImageUserNames() {
     List<String> command =
         DockerCommandBuilder.dataOwnershipCommand(
