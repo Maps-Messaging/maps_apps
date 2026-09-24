@@ -24,7 +24,27 @@ MAPS_TEST_LAB_USER=matthew ./maps_test_lab/scripts/bootstrap-ubuntu-24.04.sh
 
 The bootstrap installs OpenJDK 21, Maven, Git, Docker Engine from Docker's official Ubuntu repository, Docker Buildx and Compose, Mosquitto MQTT clients, and common diagnostic tools including `jq`, `rsync`, `tcpdump`, `iproute2`, `procps`, `zip` and `unzip`.
 
-It also creates `/srv/maps-test-lab`. It enables Docker but does not install, start or register MAPS Test Lab itself. Log out and back in after bootstrap so Docker group membership takes effect.
+It also creates `/srv/maps-test-lab`, configures the MapsMessaging APT repository, and enables Docker. It does not install, start or register MAPS Test Lab itself. Log out and back in after bootstrap so Docker group membership takes effect.
+
+The MapsMessaging APT channel defaults to `release`. For daily/development packages use:
+
+```bash
+sudo MAPS_APT_CHANNEL=daily ./maps_test_lab/scripts/bootstrap-ubuntu-24.04.sh
+```
+
+The bootstrap deliberately configures the repository but does **not** automatically install `maps-apps`, because the current `maps-apps` package depends on `maps`. Installing it automatically would also place the server package on the test host, which is not required when the actual Maps instances run in Docker.
+
+Install it explicitly when wanted:
+
+```bash
+sudo apt-get install maps-apps
+```
+
+or for the daily channel:
+
+```bash
+sudo apt-get install -t development maps-apps
+```
 
 Membership of the `docker` group effectively grants root-level control of this dedicated test server. Do not add general-purpose or untrusted users to it.
 
