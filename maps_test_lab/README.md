@@ -125,7 +125,7 @@ Example two-server lab:
       "environment": {},
       "containerCommand": [
         "--config",
-        "/opt/maps/config"
+        "/opt/maps/conf"
       ]
     },
     "ralf-b": {
@@ -142,7 +142,7 @@ Example two-server lab:
       "environment": {},
       "containerCommand": [
         "--config",
-        "/opt/maps/config"
+        "/opt/maps/conf"
       ]
     }
   }
@@ -152,9 +152,11 @@ Example two-server lab:
 The lab creates the named Docker network when necessary and mounts:
 
 ```text
-<instance>/config -> /opt/maps/config
+<instance>/config -> /opt/maps/conf
 <instance>/data   -> /opt/maps_data
 ```
+
+For Docker instances, if the per-instance config directory is empty on first start, the lab creates a temporary container from the configured image and copies the image's default `/opt/maps/conf` contents into the instance config directory before starting the real container. Existing configuration files are never overwritten by this seeding step.
 
 Additional application ports can be supplied through `ports` using normal Docker `host:container` notation.
 
