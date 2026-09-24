@@ -39,7 +39,7 @@
         <module>udp_helpers</module>
         <module>mavlink_tools</module>
         <module>canbus_replay</module>
-        <module>top</module>
+        <module>top</module>\n        <module>maps_test_lab</module>
     </modules>
 
     <developers>
