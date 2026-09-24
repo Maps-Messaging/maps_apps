@@ -108,6 +108,11 @@ public final class McpServer implements AutoCloseable {
             properties(Map.of())));
     tools.add(tool("start_instance", "Start one configured MapsMessaging instance", stringArgs("name")));
     tools.add(tool("stop_instance", "Stop one managed MapsMessaging instance", stringArgs("name")));
+    tools.add(
+        tool(
+            "delete_instance",
+            "Stop and remove one instance runtime and workspace while preserving its lab definition and Docker image",
+            stringArgs("name")));
     tools.add(tool("restart_instance", "Restart one managed MapsMessaging instance", stringArgs("name")));
     tools.add(tool("instance_status", "Return process or container status", stringArgs("name")));
 
@@ -231,6 +236,7 @@ public final class McpServer implements AutoCloseable {
             case "list_instances" -> manager.listInstances();
             case "start_instance" -> manager.start(required(args, "name"));
             case "stop_instance" -> manager.stop(required(args, "name"));
+            case "delete_instance" -> manager.delete(required(args, "name"));
             case "restart_instance" -> manager.restart(required(args, "name"));
             case "instance_status" -> manager.status(required(args, "name"));
             case "instance_logs" ->
