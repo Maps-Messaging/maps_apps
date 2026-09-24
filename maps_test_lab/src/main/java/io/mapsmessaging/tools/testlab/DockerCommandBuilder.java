@@ -10,6 +10,20 @@ final class DockerCommandBuilder {
 
   private DockerCommandBuilder() {}
 
+  static List<String> seedCreateCommand(
+      String dockerCommand, String containerName, String image) {
+    return List.of(dockerCommand, "create", "--name", containerName, image);
+  }
+
+  static List<String> seedCopyCommand(
+      String dockerCommand, String containerName, Path configDir) {
+    return List.of(
+        dockerCommand,
+        "cp",
+        containerName + ":/opt/maps/conf/.",
+        configDir.toString());
+  }
+
   static List<String> runCommand(
       String dockerCommand,
       String containerName,
@@ -27,7 +41,7 @@ final class DockerCommandBuilder {
     }
 
     command.add("-v");
-    command.add(configDir + ":/opt/maps/config");
+    command.add(configDir + ":/opt/maps/conf");
     command.add("-v");
     command.add(dataDir + ":/opt/maps_data");
 
