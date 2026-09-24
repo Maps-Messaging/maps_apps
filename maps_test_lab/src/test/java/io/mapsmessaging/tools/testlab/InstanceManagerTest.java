@@ -36,6 +36,26 @@ class InstanceManagerTest {
   }
 
   @Test
+  void deletesInstanceWorkspaceAndAllowsCleanRecreation() throws Exception {
+    try (InstanceManager manager = new InstanceManager(config("alpha"))) {
+      manager.start("alpha");
+      Path instanceDir = Path.of((String) manager.status("alpha").get("instanceDir"));
+      Path configDir = Path.of((String) manager.status("alpha").get("configDir"));
+      Files.writeString(configDir.resolve("server.yaml"), "name: alpha");
+
+      Map<String, Object> deleted = manager.delete("alpha");
+
+      assertTrue((Boolean) deleted.get("deleted"));
+      assertFalse(Files.exists(instanceDir));
+
+      Map<String, Object> restarted = manager.start("alpha");
+      assertTrue((Boolean) restarted.get("running"));
+      assertTrue(Files.exists(Path.of((String) restarted.get("configDir"))));
+      assertFalse(Files.exists(Path.of((String) restarted.get("configDir")).resolve("server.yaml")));
+    }
+  }
+
+  @Test
   void rejectsConfigPathTraversal() throws Exception {
     try (InstanceManager manager = new InstanceManager(config("alpha"))) {
       manager.start("alpha");
