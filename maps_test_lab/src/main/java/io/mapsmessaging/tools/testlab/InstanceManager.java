@@ -458,46 +458,13 @@ public final class InstanceManager implements AutoCloseable {
 
     ensureDockerNetwork(instance.network());
 
-    List<String> command = new ArrayList<>();
-    command.add(config.dockerCommand());
-    command.addAll(List.of("run", "-d", "--name", containerName));
-
-    if (!instance.network().isBlank()) {
-      command.add("--network");
-      command.add(instance.network());
-    }
-
-    command.add("-v");
-    command.add(paths.configDir() + ":/opt/maps/config");
-    command.add("-v");
-    command.add(paths.dataDir() + ":/opt/maps_data");
-
-    for (String port : instance.ports()) {
-      command.add("-p");
-      command.add(port);
-    }
-
-    Map<String, String> environment = new LinkedHashMap<>(instance.environment());
-    if (instance.debugPort() > 0) {
-      command.add("-p");
-      command.add(instance.debugPort() + ":" + instance.debugPort());
-      String jdwp =
-          "-agentlib:jdwp=transport=dt_socket,server=y,suspend="
-              + (instance.debugSuspend() ? "y" : "n")
-              + ",address=*:"
-              + instance.debugPort();
-      String current = environment.getOrDefault("JAVA_TOOL_OPTIONS", "");
-      environment.put("JAVA_TOOL_OPTIONS", (current + " " + jdwp).trim());
-    }
-
-    environment.forEach(
-        (key, value) -> {
-          command.add("-e");
-          command.add(key + "=" + value);
-        });
-
-    command.add(instance.image());
-    command.addAll(instance.containerCommand());
+    List<String> command =
+        DockerCommandBuilder.runCommand(
+            config.dockerCommand(),
+            containerName,
+            instance,
+            paths.configDir(),
+            paths.dataDir());
 
     CommandResult result = runCommand(command, Duration.ofSeconds(60));
     if (result.exitCode() != 0) {
