@@ -250,7 +250,25 @@ EOF_CONFFILES
   echo "Included MQTT logger systemd units and configuration"
 }
 
+is_developer_only_module() {
+  local candidate="$1"
+  local excluded
+
+  for excluded in "${DEVELOPER_ONLY_MODULES[@]}"; do
+    if [[ "${candidate}" == "${excluded}" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 for module in "${MODULES[@]}"; do
+  if is_developer_only_module "${module}"; then
+    echo "Excluded developer-only module ${module} from Debian package"
+    continue
+  fi
+
   jar_file="$(find_module_jar "${module}")"
   launcher_dir="${ROOT_DIR}/${module}/install/bin"
 
