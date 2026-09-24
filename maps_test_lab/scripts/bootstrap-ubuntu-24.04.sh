@@ -87,6 +87,35 @@ apt-get install -y \
 
 systemctl enable --now docker
 
+MAPS_APT_CHANNEL="${MAPS_APT_CHANNEL:-release}"
+case "${MAPS_APT_CHANNEL}" in
+  release)
+    MAPS_APT_URL="https://repository.mapsmessaging.io/repository/maps_apt_release/"
+    MAPS_APT_SUITE="stable"
+    MAPS_APT_LIST="/etc/apt/sources.list.d/mapsmessaging-release.list"
+    ;;
+  daily|development)
+    MAPS_APT_URL="https://repository.mapsmessaging.io/repository/maps_apt_daily/"
+    MAPS_APT_SUITE="development"
+    MAPS_APT_LIST="/etc/apt/sources.list.d/mapsmessaging-daily.list"
+    ;;
+  *)
+    echo "MAPS_APT_CHANNEL must be release or daily; found: ${MAPS_APT_CHANNEL}" >&2
+    exit 1
+    ;;
+esac
+
+echo "Configuring MapsMessaging APT repository (${MAPS_APT_CHANNEL})"
+curl -fsSL \
+  https://repository.mapsmessaging.io/repository/public_key/daily/apt_daily_key.gpg \
+  | gpg --dearmor --yes -o /usr/share/keyrings/mapsmessaging-apt.gpg
+
+cat > "${MAPS_APT_LIST}" <<EOF
+deb [arch=all signed-by=/usr/share/keyrings/mapsmessaging-apt.gpg] ${MAPS_APT_URL} ${MAPS_APT_SUITE} main
+EOF
+
+apt-get update
+
 if ! getent group docker >/dev/null; then
   groupadd docker
 fi
@@ -105,6 +134,9 @@ git --version
 docker --version
 docker compose version
 mosquitto_pub --help 2>&1 | head -n 1 || true
+echo
+echo "MapsMessaging APT packages:"
+apt-cache policy maps maps-apps | sed -n '1,20p'
 
 echo
 echo "Verifying Docker daemon..."
@@ -123,4 +155,13 @@ echo "  cd maps_apps"
 echo "  git checkout feat/MSG-333-mcp-test-lab"
 echo "  mvn clean verify"
 echo
+echo "MapsMessaging APT repository is configured for channel: ${MAPS_APT_CHANNEL}"
+echo "Install tools explicitly when required:"
+if [[ "${MAPS_APT_CHANNEL}" == "daily" || "${MAPS_APT_CHANNEL}" == "development" ]]; then
+  echo "  sudo apt-get install -t development maps-apps"
+else
+  echo "  sudo apt-get install maps-apps"
+fi
+echo
+echo "The bootstrap does not install maps-apps automatically because maps-apps depends on maps."
 echo "Docker group membership grants effectively root-level control of this isolated test server."
