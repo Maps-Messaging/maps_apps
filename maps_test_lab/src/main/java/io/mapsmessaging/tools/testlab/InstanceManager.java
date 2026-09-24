@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,16 +14,20 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public final class InstanceManager implements AutoCloseable {
 
-  private static final int MAX_CONFIG_BYTES = 1024 * 1024;
+  private static final int MAX_CONFIG_BYTES = 5 * 1024 * 1024;
+  private static final int MAX_LOG_READ_BYTES = 1024 * 1024;
   private static final Duration STOP_TIMEOUT = Duration.ofSeconds(10);
   private static final DateTimeFormatter EVIDENCE_TIME =
       DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
@@ -40,54 +43,28 @@ public final class InstanceManager implements AutoCloseable {
   }
 
   public List<Map<String, Object>> listInstances() {
-    return config.instances().keySet().stream()
-        .sorted()
-        .map(this::status)
-        .toList();
+    return config.instances().keySet().stream().sorted().map(this::status).toList();
   }
 
   public synchronized Map<String, Object> start(String name) throws IOException {
-    LabConfig.InstanceConfig instanceConfig = config.requireInstance(name);
-    Process current = processes.get(name);
-    if (current != null && current.isAlive()) {
-      throw new IllegalStateException("Instance already running: " + name);
-    }
-
-    Paths paths = preparePaths(name);
-    List<String> command =
-        instanceConfig.command().stream().map(value -> expand(value, name, paths)).toList();
-
-    ProcessBuilder builder = new ProcessBuilder(command);
-    builder.directory(paths.instanceDir().toFile());
-    builder.redirectErrorStream(true);
-    builder.redirectOutput(ProcessBuilder.Redirect.appendTo(paths.logFile().toFile()));
-    builder.environment().putAll(instanceConfig.environment());
-    builder.environment().put("MAPS_TEST_LAB_INSTANCE", name);
-    builder.environment().put("MAPS_TEST_LAB_INSTANCE_DIR", paths.instanceDir().toString());
-    builder.environment().put("MAPS_TEST_LAB_CONFIG_DIR", paths.configDir().toString());
-    builder.environment().put("MAPS_TEST_LAB_DATA_DIR", paths.dataDir().toString());
-
-    Process process = builder.start();
-    processes.put(name, process);
-
-    try {
-      if (process.waitFor(250, TimeUnit.MILLISECONDS)) {
-        processes.remove(name);
-        throw new IOException(
-            "Instance " + name + " exited during startup with code " + process.exitValue());
-      }
-    } catch (InterruptedException exception) {
-      process.destroyForcibly();
-      processes.remove(name);
-      Thread.currentThread().interrupt();
-      throw new IOException("Interrupted while starting instance " + name, exception);
-    }
-
-    return status(name);
+    LabConfig.InstanceConfig instance = config.requireInstance(name);
+    return instance.provider().equals("docker")
+        ? startDocker(name, instance)
+        : startProcess(name, instance);
   }
 
   public synchronized Map<String, Object> stop(String name) {
-    config.requireInstance(name);
+    LabConfig.InstanceConfig instance = config.requireInstance(name);
+    if (instance.provider().equals("docker")) {
+      try {
+        runCommand(
+            List.of(config.dockerCommand(), "stop", "-t", "10", dockerContainerName(name)),
+            Duration.ofSeconds(20));
+      } catch (IOException ignored) {
+      }
+      return status(name);
+    }
+
     Process process = processes.get(name);
     if (process == null || !process.isAlive()) {
       processes.remove(name);
@@ -115,54 +92,159 @@ public final class InstanceManager implements AutoCloseable {
   }
 
   public Map<String, Object> status(String name) {
-    LabConfig.InstanceConfig instanceConfig = config.requireInstance(name);
-    Process process = processes.get(name);
-    boolean running = process != null && process.isAlive();
+    LabConfig.InstanceConfig instance = config.requireInstance(name);
     Paths paths = paths(name);
+    boolean running;
+    Long pid = null;
+
+    if (instance.provider().equals("docker")) {
+      try {
+        CommandResult result =
+            runCommand(
+                List.of(
+                    config.dockerCommand(),
+                    "inspect",
+                    "-f",
+                    "{{.State.Running}} {{.State.Pid}}",
+                    dockerContainerName(name)),
+                Duration.ofSeconds(10));
+        if (result.exitCode() == 0 && !result.output().isBlank()) {
+          String[] values = result.output().trim().split("\\s+");
+          running = Boolean.parseBoolean(values[0]);
+          if (running && values.length > 1) {
+            pid = Long.parseLong(values[1]);
+          }
+        } else {
+          running = false;
+        }
+      } catch (Exception exception) {
+        running = false;
+      }
+    } else {
+      Process process = processes.get(name);
+      running = process != null && process.isAlive();
+      pid = running ? process.pid() : null;
+    }
 
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("name", name);
+    result.put("provider", instance.provider());
     result.put("running", running);
-    result.put("pid", running ? process.pid() : null);
+    result.put("pid", pid);
     result.put("instanceDir", paths.instanceDir().toString());
     result.put("configDir", paths.configDir().toString());
     result.put("dataDir", paths.dataDir().toString());
-    result.put("logFile", paths.logFile().toString());
-    result.put("mqttHost", instanceConfig.mqttHost());
-    result.put("mqttPort", instanceConfig.mqttPort());
+    result.put("logsDir", paths.logsDir().toString());
+    result.put("mqttHost", instance.mqttHost());
+    result.put("mqttPort", instance.mqttPort());
+
+    if (instance.provider().equals("docker")) {
+      result.put("container", dockerContainerName(name));
+      result.put("image", instance.image());
+      result.put("network", instance.network());
+      result.put("debugPort", instance.debugPort() > 0 ? instance.debugPort() : null);
+    }
     return result;
   }
 
   public String logs(String name, int requestedLines) throws IOException {
-    config.requireInstance(name);
+    LabConfig.InstanceConfig instance = config.requireInstance(name);
     int lines = requestedLines <= 0 ? 200 : Math.min(requestedLines, 5000);
-    Path logFile = paths(name).logFile();
-    if (!Files.exists(logFile)) {
-      return "";
+
+    if (instance.provider().equals("docker")) {
+      CommandResult result =
+          runCommand(
+              List.of(
+                  config.dockerCommand(),
+                  "logs",
+                  "--tail",
+                  Integer.toString(lines),
+                  dockerContainerName(name)),
+              Duration.ofSeconds(15));
+      if (result.exitCode() != 0) {
+        throw new IOException(result.output());
+      }
+      return result.output();
     }
 
-    ArrayDeque<String> tail = new ArrayDeque<>(lines);
-    try (BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        if (tail.size() == lines) {
-          tail.removeFirst();
-        }
-        tail.addLast(line);
+    return tail(paths(name).logFile(), lines);
+  }
+
+  public List<Map<String, Object>> listLogFiles(String name) throws IOException {
+    config.requireInstance(name);
+    refreshDockerLog(name);
+    Path logsDir = paths(name).logsDir();
+    if (!Files.exists(logsDir)) {
+      return List.of();
+    }
+
+    try (var stream = Files.walk(logsDir)) {
+      return stream
+          .filter(Files::isRegularFile)
+          .sorted()
+          .map(
+              file -> {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("path", logsDir.relativize(file).toString());
+                try {
+                  item.put("size", Files.size(file));
+                  item.put("modified", Files.getLastModifiedTime(file).toInstant().toString());
+                } catch (IOException exception) {
+                  item.put("size", -1L);
+                }
+                return item;
+              })
+          .toList();
+    }
+  }
+
+  public Map<String, Object> readLog(
+      String name, String relativePath, long offset, int requestedBytes) throws IOException {
+    config.requireInstance(name);
+    refreshDockerLog(name);
+    Path logsDir = paths(name).logsDir().toAbsolutePath().normalize();
+    Path target = confinedPath(logsDir, relativePath, "Log");
+
+    if (!Files.isRegularFile(target)) {
+      throw new IllegalArgumentException("Log file does not exist: " + relativePath);
+    }
+
+    long size = Files.size(target);
+    long start = Math.max(0L, Math.min(offset, size));
+    int length =
+        Math.max(
+            1,
+            Math.min(
+                requestedBytes <= 0 ? 64 * 1024 : requestedBytes,
+                MAX_LOG_READ_BYTES));
+    int available = (int) Math.min(length, size - start);
+    byte[] bytes = new byte[available];
+
+    try (var input = Files.newInputStream(target)) {
+      input.skipNBytes(start);
+      int read = input.readNBytes(bytes, 0, available);
+      if (read != available) {
+        bytes = java.util.Arrays.copyOf(bytes, read);
       }
     }
-    return String.join(System.lineSeparator(), tail);
+
+    long next = start + bytes.length;
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("path", relativePath);
+    result.put("offset", start);
+    result.put("nextOffset", next);
+    result.put("size", size);
+    result.put("eof", next >= size);
+    result.put("text", new String(bytes, StandardCharsets.UTF_8));
+    return result;
   }
 
   public String readConfig(String name, String relativePath) throws IOException {
     config.requireInstance(name);
     Path configDir = paths(name).configDir().toAbsolutePath().normalize();
     String requested = relativePath == null || relativePath.isBlank() ? "." : relativePath;
-    Path target = configDir.resolve(requested).normalize();
+    Path target = confinedPath(configDir, requested, "Configuration");
 
-    if (!target.startsWith(configDir)) {
-      throw new IllegalArgumentException("Configuration path escapes instance config directory");
-    }
     if (!Files.exists(target)) {
       throw new IllegalArgumentException("Configuration path does not exist: " + requested);
     }
@@ -180,9 +262,44 @@ public final class InstanceManager implements AutoCloseable {
     }
 
     if (Files.size(target) > MAX_CONFIG_BYTES) {
-      throw new IllegalArgumentException("Configuration file exceeds 1 MiB limit");
+      throw new IllegalArgumentException("Configuration file exceeds 5 MiB limit");
     }
     return Files.readString(target, StandardCharsets.UTF_8);
+  }
+
+  public Map<String, Object> writeConfig(
+      String name,
+      String relativePath,
+      String content,
+      String encoding,
+      boolean overwrite)
+      throws IOException {
+    config.requireInstance(name);
+    if (relativePath == null || relativePath.isBlank()) {
+      throw new IllegalArgumentException("Configuration path is required");
+    }
+
+    Path configDir = preparePaths(name).configDir().toAbsolutePath().normalize();
+    Path target = confinedPath(configDir, relativePath, "Configuration");
+    byte[] bytes =
+        "base64".equalsIgnoreCase(encoding)
+            ? Base64.getDecoder().decode(content == null ? "" : content)
+            : (content == null ? "" : content).getBytes(StandardCharsets.UTF_8);
+
+    if (bytes.length > MAX_CONFIG_BYTES) {
+      throw new IllegalArgumentException("Configuration content exceeds 5 MiB limit");
+    }
+    if (Files.exists(target) && !overwrite) {
+      throw new IllegalStateException("Configuration file already exists: " + relativePath);
+    }
+
+    Files.createDirectories(target.getParent());
+    Files.write(target, bytes);
+
+    return Map.of(
+        "path", configDir.relativize(target).toString(),
+        "size", bytes.length,
+        "overwritten", overwrite);
   }
 
   public Map<String, Object> mqttPublish(
@@ -208,9 +325,7 @@ public final class InstanceManager implements AutoCloseable {
     if (retain) {
       command.add("-r");
     }
-
-    CommandResult result = runCommand(command, Duration.ofSeconds(15));
-    return commandResult(result);
+    return commandResult(runCommand(command, Duration.ofSeconds(15)));
   }
 
   public Map<String, Object> mqttSubscribe(
@@ -235,17 +350,13 @@ public final class InstanceManager implements AutoCloseable {
             "1",
             "-W",
             Integer.toString(timeout));
-
-    CommandResult result = runCommand(command, Duration.ofSeconds(timeout + 5L));
-    return commandResult(result);
+    return commandResult(runCommand(command, Duration.ofSeconds(timeout + 5L)));
   }
 
   public Path createEvidence(String name, String scenario) throws IOException {
     config.requireInstance(name);
-    String safeScenario =
-        scenario == null || scenario.isBlank()
-            ? "manual"
-            : scenario.replaceAll("[^A-Za-z0-9._-]", "_");
+    refreshDockerLog(name);
+    String safeScenario = safeScenario(scenario);
     Path destination =
         config
             .root()
@@ -262,18 +373,195 @@ public final class InstanceManager implements AutoCloseable {
     manifest.put("scenario", safeScenario);
     manifest.put("instance", status(name));
     Files.writeString(
-        destination.resolve("manifest.json"),
-        gson.toJson(manifest),
-        StandardCharsets.UTF_8);
-
+        destination.resolve("manifest.json"), gson.toJson(manifest), StandardCharsets.UTF_8);
     return destination;
+  }
+
+  public Map<String, Object> createEvidenceArchive(String name, String scenario) throws IOException {
+    Path evidence = createEvidence(name, scenario);
+    Path zip = evidence.resolveSibling(evidence.getFileName() + ".zip");
+    zipDirectory(evidence, zip);
+    return Map.of("path", zip.toString(), "size", Files.size(zip));
   }
 
   @Override
   public void close() {
-    for (String name : new ArrayList<>(processes.keySet())) {
+    for (String name : new ArrayList<>(config.instances().keySet())) {
       stop(name);
     }
+  }
+
+  private Map<String, Object> startProcess(
+      String name, LabConfig.InstanceConfig instance) throws IOException {
+    Process current = processes.get(name);
+    if (current != null && current.isAlive()) {
+      throw new IllegalStateException("Instance already running: " + name);
+    }
+
+    Paths paths = preparePaths(name);
+    List<String> command =
+        instance.command().stream().map(value -> expand(value, name, paths)).toList();
+
+    ProcessBuilder builder = new ProcessBuilder(command);
+    builder.directory(paths.instanceDir().toFile());
+    builder.redirectErrorStream(true);
+    builder.redirectOutput(ProcessBuilder.Redirect.appendTo(paths.logFile().toFile()));
+    builder.environment().putAll(instance.environment());
+    builder.environment().put("MAPS_TEST_LAB_INSTANCE", name);
+    builder.environment().put("MAPS_TEST_LAB_INSTANCE_DIR", paths.instanceDir().toString());
+    builder.environment().put("MAPS_TEST_LAB_CONFIG_DIR", paths.configDir().toString());
+    builder.environment().put("MAPS_TEST_LAB_DATA_DIR", paths.dataDir().toString());
+
+    Process process = builder.start();
+    processes.put(name, process);
+
+    try {
+      if (process.waitFor(250, TimeUnit.MILLISECONDS)) {
+        processes.remove(name);
+        throw new IOException(
+            "Instance " + name + " exited during startup with code " + process.exitValue());
+      }
+    } catch (InterruptedException exception) {
+      process.destroyForcibly();
+      processes.remove(name);
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while starting instance " + name, exception);
+    }
+
+    return status(name);
+  }
+
+  private Map<String, Object> startDocker(
+      String name, LabConfig.InstanceConfig instance) throws IOException {
+    Paths paths = preparePaths(name);
+    String containerName = dockerContainerName(name);
+
+    CommandResult existing =
+        runCommand(
+            List.of(
+                config.dockerCommand(),
+                "ps",
+                "-a",
+                "--filter",
+                "name=^/" + containerName + "$",
+                "--format",
+                "{{.ID}}"),
+            Duration.ofSeconds(10));
+
+    if (!existing.output().isBlank()) {
+      if (Boolean.TRUE.equals(status(name).get("running"))) {
+        throw new IllegalStateException("Instance already running: " + name);
+      }
+      runCommand(
+          List.of(config.dockerCommand(), "rm", "-f", containerName), Duration.ofSeconds(15));
+    }
+
+    ensureDockerNetwork(instance.network());
+
+    List<String> command = new ArrayList<>();
+    command.add(config.dockerCommand());
+    command.addAll(List.of("run", "-d", "--name", containerName));
+
+    if (!instance.network().isBlank()) {
+      command.add("--network");
+      command.add(instance.network());
+    }
+
+    command.add("-v");
+    command.add(paths.configDir() + ":/opt/maps/config");
+    command.add("-v");
+    command.add(paths.dataDir() + ":/opt/maps_data");
+
+    for (String port : instance.ports()) {
+      command.add("-p");
+      command.add(port);
+    }
+
+    Map<String, String> environment = new LinkedHashMap<>(instance.environment());
+    if (instance.debugPort() > 0) {
+      command.add("-p");
+      command.add(instance.debugPort() + ":" + instance.debugPort());
+      String jdwp =
+          "-agentlib:jdwp=transport=dt_socket,server=y,suspend="
+              + (instance.debugSuspend() ? "y" : "n")
+              + ",address=*:"
+              + instance.debugPort();
+      String current = environment.getOrDefault("JAVA_TOOL_OPTIONS", "");
+      environment.put("JAVA_TOOL_OPTIONS", (current + " " + jdwp).trim());
+    }
+
+    environment.forEach(
+        (key, value) -> {
+          command.add("-e");
+          command.add(key + "=" + value);
+        });
+
+    command.add(instance.image());
+    command.addAll(instance.containerCommand());
+
+    CommandResult result = runCommand(command, Duration.ofSeconds(60));
+    if (result.exitCode() != 0) {
+      throw new IOException("Docker start failed for " + name + ": " + result.output());
+    }
+
+    return status(name);
+  }
+
+  private void ensureDockerNetwork(String network) throws IOException {
+    if (network == null || network.isBlank()) {
+      return;
+    }
+
+    CommandResult inspect =
+        runCommand(
+            List.of(config.dockerCommand(), "network", "inspect", network),
+            Duration.ofSeconds(10));
+    if (inspect.exitCode() == 0) {
+      return;
+    }
+
+    CommandResult create =
+        runCommand(
+            List.of(config.dockerCommand(), "network", "create", network),
+            Duration.ofSeconds(15));
+    if (create.exitCode() != 0) {
+      throw new IOException("Unable to create Docker network " + network + ": " + create.output());
+    }
+  }
+
+  private void refreshDockerLog(String name) throws IOException {
+    LabConfig.InstanceConfig instance = config.requireInstance(name);
+    if (!instance.provider().equals("docker")) {
+      return;
+    }
+
+    Paths paths = preparePaths(name);
+    CommandResult result =
+        runCommand(
+            List.of(config.dockerCommand(), "logs", dockerContainerName(name)),
+            Duration.ofSeconds(30));
+    if (result.exitCode() == 0) {
+      Files.writeString(
+          paths.logsDir().resolve("docker.log"), result.output(), StandardCharsets.UTF_8);
+    }
+  }
+
+  private String tail(Path file, int lines) throws IOException {
+    if (!Files.exists(file)) {
+      return "";
+    }
+
+    ArrayDeque<String> tail = new ArrayDeque<>(lines);
+    try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (tail.size() == lines) {
+          tail.removeFirst();
+        }
+        tail.addLast(line);
+      }
+    }
+    return String.join(System.lineSeparator(), tail);
   }
 
   private Paths preparePaths(String name) throws IOException {
@@ -291,6 +579,7 @@ public final class InstanceManager implements AutoCloseable {
     if (!instanceDir.startsWith(expectedRoot)) {
       throw new IllegalArgumentException("Instance path escapes test lab root");
     }
+
     Path logs = instanceDir.resolve("logs");
     return new Paths(
         instanceDir,
@@ -300,6 +589,18 @@ public final class InstanceManager implements AutoCloseable {
         logs.resolve("maps.log"));
   }
 
+  private Path confinedPath(Path root, String relativePath, String label) {
+    if (relativePath == null || relativePath.isBlank()) {
+      throw new IllegalArgumentException(label + " path is required");
+    }
+
+    Path target = root.resolve(relativePath).normalize();
+    if (!target.startsWith(root)) {
+      throw new IllegalArgumentException(label + " path escapes instance directory");
+    }
+    return target;
+  }
+
   private String expand(String value, String name, Paths paths) {
     return value
         .replace("${instance}", name)
@@ -307,6 +608,16 @@ public final class InstanceManager implements AutoCloseable {
         .replace("${configDir}", paths.configDir().toString())
         .replace("${dataDir}", paths.dataDir().toString())
         .replace("${logFile}", paths.logFile().toString());
+  }
+
+  private String dockerContainerName(String name) {
+    return "maps-test-lab-" + name;
+  }
+
+  private String safeScenario(String scenario) {
+    return scenario == null || scenario.isBlank()
+        ? "manual"
+        : scenario.replaceAll("[^A-Za-z0-9._-]", "_");
   }
 
   private CommandResult runCommand(List<String> command, Duration timeout) throws IOException {
@@ -339,6 +650,7 @@ public final class InstanceManager implements AutoCloseable {
     if (!Files.exists(source)) {
       return;
     }
+
     try (var stream = Files.walk(source)) {
       for (Path path : stream.sorted(Comparator.naturalOrder()).toList()) {
         Path relative = source.relativize(path);
@@ -349,6 +661,18 @@ public final class InstanceManager implements AutoCloseable {
           Files.createDirectories(target.getParent());
           Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
         }
+      }
+    }
+  }
+
+  private void zipDirectory(Path source, Path zip) throws IOException {
+    try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(zip));
+        var stream = Files.walk(source)) {
+      for (Path file : stream.filter(Files::isRegularFile).sorted().toList()) {
+        String entryName = source.getFileName() + "/" + source.relativize(file);
+        output.putNextEntry(new ZipEntry(entryName.replace('\\', '/')));
+        Files.copy(file, output);
+        output.closeEntry();
       }
     }
   }
