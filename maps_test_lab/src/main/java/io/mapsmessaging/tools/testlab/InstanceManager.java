@@ -490,6 +490,7 @@ public final class InstanceManager implements AutoCloseable {
     }
 
     ensureDockerConfigSeeded(name, instance, paths.configDir());
+    ensureDockerDataOwnership(instance, paths.dataDir());
     ensureDockerNetwork(instance.network());
 
     boolean appendContainerCommand =
@@ -561,6 +562,22 @@ public final class InstanceManager implements AutoCloseable {
       runCommand(
           List.of(config.dockerCommand(), "rm", "-f", seedContainer),
           Duration.ofSeconds(10));
+    }
+  }
+
+  private void ensureDockerDataOwnership(
+      LabConfig.InstanceConfig instance, Path dataDir) throws IOException {
+    CommandResult ownership =
+        runCommand(
+            DockerCommandBuilder.dataOwnershipCommand(
+                config.dockerCommand(), instance.image(), dataDir),
+            Duration.ofSeconds(30));
+    if (ownership.exitCode() != 0) {
+      throw new IOException(
+          "Unable to set Maps data directory ownership for image "
+              + instance.image()
+              + ": "
+              + ownership.output());
     }
   }
 
