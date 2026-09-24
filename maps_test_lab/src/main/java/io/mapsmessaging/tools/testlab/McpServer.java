@@ -14,7 +14,8 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class McpServer implements AutoCloseable {
 
@@ -22,6 +23,7 @@ public final class McpServer implements AutoCloseable {
 
   private final HttpServer server;
   private final InstanceManager manager;
+  private final ExecutorService executor;
   private final Gson gson = new Gson();
 
   public McpServer(LabConfig config, InstanceManager manager) throws IOException {
@@ -107,16 +109,37 @@ public final class McpServer implements AutoCloseable {
     tools.add(tool("start_instance", "Start one configured MapsMessaging instance", stringArgs("name")));
     tools.add(tool("stop_instance", "Stop one managed MapsMessaging instance", stringArgs("name")));
     tools.add(tool("restart_instance", "Restart one managed MapsMessaging instance", stringArgs("name")));
-    tools.add(tool("instance_status", "Return process and workspace status", stringArgs("name")));
+    tools.add(tool("instance_status", "Return process or container status", stringArgs("name")));
+
     tools.add(
         tool(
             "instance_logs",
-            "Return the tail of an instance log",
+            "Return the tail of process or Docker logs",
             properties(
                 Map.of(
                     "name", schema("string"),
                     "lines", schema("integer")),
                 "name")));
+
+    tools.add(
+        tool(
+            "list_log_files",
+            "List persisted log files available for an instance",
+            stringArgs("name")));
+
+    tools.add(
+        tool(
+            "read_log",
+            "Read a bounded chunk of a persisted log file for analysis",
+            properties(
+                Map.of(
+                    "name", schema("string"),
+                    "path", schema("string"),
+                    "offset", schema("integer"),
+                    "bytes", schema("integer")),
+                "name",
+                "path")));
+
     tools.add(
         tool(
             "instance_config",
@@ -126,6 +149,22 @@ public final class McpServer implements AutoCloseable {
                     "name", schema("string"),
                     "path", schema("string")),
                 "name")));
+
+    tools.add(
+        tool(
+            "write_instance_config",
+            "Create or replace one file within an instance config directory",
+            properties(
+                Map.of(
+                    "name", schema("string"),
+                    "path", schema("string"),
+                    "content", schema("string"),
+                    "encoding", enumSchema("utf8", "base64"),
+                    "overwrite", schema("boolean")),
+                "name",
+                "path",
+                "content")));
+
     tools.add(
         tool(
             "mqtt_publish",
@@ -139,6 +178,7 @@ public final class McpServer implements AutoCloseable {
                     "retain", schema("boolean")),
                 "name",
                 "topic")));
+
     tools.add(
         tool(
             "mqtt_subscribe",
@@ -151,10 +191,21 @@ public final class McpServer implements AutoCloseable {
                     "timeoutSeconds", schema("integer")),
                 "name",
                 "topic")));
+
     tools.add(
         tool(
             "create_evidence",
-            "Snapshot config, logs and process state for an instance",
+            "Snapshot config, logs and instance status",
+            properties(
+                Map.of(
+                    "name", schema("string"),
+                    "scenario", schema("string")),
+                "name")));
+
+    tools.add(
+        tool(
+            "create_evidence_archive",
+            "Create a ZIP bundle containing config, logs and instance status",
             properties(
                 Map.of(
                     "name", schema("string"),
@@ -184,8 +235,22 @@ public final class McpServer implements AutoCloseable {
             case "instance_status" -> manager.status(required(args, "name"));
             case "instance_logs" ->
                 manager.logs(required(args, "name"), integer(args, "lines", 200));
+            case "list_log_files" -> manager.listLogFiles(required(args, "name"));
+            case "read_log" ->
+                manager.readLog(
+                    required(args, "name"),
+                    required(args, "path"),
+                    longValue(args, "offset", 0L),
+                    integer(args, "bytes", 64 * 1024));
             case "instance_config" ->
                 manager.readConfig(required(args, "name"), string(args, "path", "."));
+            case "write_instance_config" ->
+                manager.writeConfig(
+                    required(args, "name"),
+                    required(args, "path"),
+                    required(args, "content"),
+                    string(args, "encoding", "utf8"),
+                    bool(args, "overwrite", false));
             case "mqtt_publish" ->
                 manager.mqttPublish(
                     required(args, "name"),
@@ -205,6 +270,9 @@ public final class McpServer implements AutoCloseable {
                       required(args, "name"), string(args, "scenario", "manual"));
               yield Map.of("path", path.toString());
             }
+            case "create_evidence_archive" ->
+                manager.createEvidenceArchive(
+                    required(args, "name"), string(args, "scenario", "manual"));
             default -> throw new IllegalArgumentException("Unknown tool: " + name);
           };
 
@@ -242,6 +310,10 @@ public final class McpServer implements AutoCloseable {
 
   private Map<String, Object> schema(String type) {
     return Map.of("type", type);
+  }
+
+  private Map<String, Object> enumSchema(String... values) {
+    return Map.of("type", "string", "enum", java.util.List.of(values));
   }
 
   private JsonObject toolResult(JsonElement id, String text, boolean isError) {
@@ -299,6 +371,12 @@ public final class McpServer implements AutoCloseable {
   private int integer(JsonObject object, String name, int fallback) {
     return object != null && object.has(name) && !object.get(name).isJsonNull()
         ? object.get(name).getAsInt()
+        : fallback;
+  }
+
+  private long longValue(JsonObject object, String name, long fallback) {
+    return object != null && object.has(name) && !object.get(name).isJsonNull()
+        ? object.get(name).getAsLong()
         : fallback;
   }
 
