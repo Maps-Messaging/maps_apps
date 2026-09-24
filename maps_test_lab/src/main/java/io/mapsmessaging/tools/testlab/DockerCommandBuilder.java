@@ -15,7 +15,8 @@ final class DockerCommandBuilder {
       String containerName,
       LabConfig.InstanceConfig instance,
       Path configDir,
-      Path dataDir) {
+      Path dataDir,
+      boolean appendContainerCommand) {
     List<String> command = new ArrayList<>();
     command.add(dockerCommand);
     command.addAll(List.of("run", "-d", "--name", containerName));
@@ -57,7 +58,9 @@ final class DockerCommandBuilder {
         });
 
     command.add(instance.image());
-    command.addAll(instance.containerCommand());
+    if (appendContainerCommand) {
+      command.addAll(instance.containerCommand());
+    }
     return List.copyOf(command);
   }
 }
