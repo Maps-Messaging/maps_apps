@@ -50,6 +50,30 @@ class InstanceManagerTest {
   }
 
   @Test
+  void writesConfigAndCreatesDownloadableEvidenceArchive() throws Exception {
+    try (InstanceManager manager = new InstanceManager(config("alpha"))) {
+      manager.writeConfig("alpha", "nested/server.yaml", "name: alpha", "utf8", false);
+
+      assertTrue(manager.readConfig("alpha", "nested/server.yaml").contains("alpha"));
+      assertThrows(
+          IllegalStateException.class,
+          () ->
+              manager.writeConfig(
+                  "alpha", "nested/server.yaml", "name: changed", "utf8", false));
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.writeConfig(
+                  "alpha", "../escape.yaml", "bad", "utf8", true));
+
+      Map<String, Object> archive = manager.createEvidenceArchive("alpha", "config-test");
+      Path zip = Path.of((String) archive.get("path"));
+      assertTrue(Files.exists(zip));
+      assertTrue(Files.size(zip) > 0);
+    }
+  }
+
+  @Test
   void capturesEvidenceWithConfigLogsAndManifest() throws Exception {
     try (InstanceManager manager = new InstanceManager(config("alpha"))) {
       manager.start("alpha");
