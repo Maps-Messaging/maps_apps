@@ -257,6 +257,7 @@ Bind to a non-loopback address only on an isolated test network. The server can 
 - `list_instances`
 - `start_instance`
 - `stop_instance`
+- `delete_instance`
 - `restart_instance`
 - `instance_status`
 - `instance_logs`
@@ -268,6 +269,8 @@ Bind to a non-loopback address only on an isolated test network. The server can 
 - `mqtt_subscribe`
 - `create_evidence`
 - `create_evidence_archive`
+
+`delete_instance` stops and removes the managed runtime plus that instance's local config/data/log workspace. The instance remains declared in `lab.json`, and Docker images are preserved so a subsequent `start_instance` performs a clean recreation and config reseed.
 
 MCP callers cannot supply arbitrary executable commands. Process commands, Docker images, networks and container commands come from `lab.json`.
 
