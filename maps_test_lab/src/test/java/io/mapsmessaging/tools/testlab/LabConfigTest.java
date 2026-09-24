@@ -39,6 +39,39 @@ class LabConfigTest {
   }
 
   @Test
+  void loadsDockerInstanceWithDebugSettings() throws Exception {
+    Path file = tempDir.resolve("docker-lab.json");
+    Files.writeString(
+        file,
+        """
+        {
+          "root": "work",
+          "dockerCommand": "docker",
+          "instances": {
+            "ralf-a": {
+              "provider": "docker",
+              "image": "mapsmessaging/server:test",
+              "network": "ralf-lab",
+              "ports": ["18831:1883"],
+              "debugPort": 5005,
+              "debugSuspend": true,
+              "containerCommand": ["--config", "/opt/maps/config"]
+            }
+          }
+        }
+        """);
+
+    LabConfig config = LabConfig.load(file);
+    LabConfig.InstanceConfig instance = config.requireInstance("ralf-a");
+
+    assertEquals("docker", instance.provider());
+    assertEquals("mapsmessaging/server:test", instance.image());
+    assertEquals("ralf-lab", instance.network());
+    assertEquals(5005, instance.debugPort());
+    assertTrue(instance.debugSuspend());
+  }
+
+  @Test
   void rejectsInvalidInstanceNames() {
     IllegalArgumentException exception =
         assertThrows(
