@@ -70,6 +70,10 @@ class McpServerTest {
       assertTrue(tools.body().contains("\"start_instance\""));
       assertTrue(tools.body().contains("\"mqtt_publish\""));
       assertTrue(tools.body().contains("\"create_evidence\""));
+      assertTrue(tools.body().contains("\"write_instance_config\""));
+      assertTrue(tools.body().contains("\"list_log_files\""));
+      assertTrue(tools.body().contains("\"read_log\""));
+      assertTrue(tools.body().contains("\"create_evidence_archive\""));
 
       HttpResponse<String> status =
           post(
