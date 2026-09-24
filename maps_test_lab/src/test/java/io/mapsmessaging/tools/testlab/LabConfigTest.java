@@ -86,7 +86,7 @@ class LabConfigTest {
                     java.util.Map.of(
                         "../escape",
                         new LabConfig.InstanceConfig(
-                            java.util.List.of("java"), java.util.Map.of(), "localhost", 1883)))));
+                            java.util.List.of("java"), java.util.Map.of(), "localhost", 1883))));
 
     assertTrue(exception.getMessage().contains("Invalid instance name"));
   }
