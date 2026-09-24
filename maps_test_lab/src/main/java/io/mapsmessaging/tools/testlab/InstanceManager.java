@@ -456,6 +456,7 @@ public final class InstanceManager implements AutoCloseable {
           List.of(config.dockerCommand(), "rm", "-f", containerName), Duration.ofSeconds(15));
     }
 
+    ensureDockerConfigSeeded(name, instance, paths.configDir());
     ensureDockerNetwork(instance.network());
 
     boolean appendContainerCommand =
@@ -476,6 +477,58 @@ public final class InstanceManager implements AutoCloseable {
     }
 
     return status(name);
+  }
+
+  private void ensureDockerConfigSeeded(
+      String name, LabConfig.InstanceConfig instance, Path configDir) throws IOException {
+    try (var stream = Files.list(configDir)) {
+      if (stream.findAny().isPresent()) {
+        return;
+      }
+    }
+
+    String seedContainer = dockerContainerName(name) + "-config-seed";
+    runCommand(
+        List.of(config.dockerCommand(), "rm", "-f", seedContainer),
+        Duration.ofSeconds(10));
+
+    CommandResult create =
+        runCommand(
+            DockerCommandBuilder.seedCreateCommand(
+                config.dockerCommand(), seedContainer, instance.image()),
+            Duration.ofSeconds(30));
+    if (create.exitCode() != 0) {
+      throw new IOException(
+          "Unable to create configuration seed container for "
+              + name
+              + ": "
+              + create.output());
+    }
+
+    try {
+      CommandResult copy =
+          runCommand(
+              DockerCommandBuilder.seedCopyCommand(
+                  config.dockerCommand(), seedContainer, configDir),
+              Duration.ofSeconds(30));
+      if (copy.exitCode() != 0) {
+        throw new IOException(
+            "Unable to seed configuration for " + name + ": " + copy.output());
+      }
+
+      try (var stream = Files.list(configDir)) {
+        if (stream.findAny().isEmpty()) {
+          throw new IOException(
+              "Docker image "
+                  + instance.image()
+                  + " did not provide configuration under /opt/maps/conf");
+        }
+      }
+    } finally {
+      runCommand(
+          List.of(config.dockerCommand(), "rm", "-f", seedContainer),
+          Duration.ofSeconds(10));
+    }
   }
 
   private boolean dockerImageHasEntrypoint(String image) throws IOException {
