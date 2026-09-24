@@ -109,6 +109,20 @@ public final class InstanceManager implements AutoCloseable {
     }
 
     Path instanceDir = paths(name).instanceDir();
+    if (instance.provider().equals("docker") && Files.exists(instanceDir)) {
+      CommandResult cleanup =
+          runCommand(
+              DockerCommandBuilder.workspaceCleanupCommand(
+                  config.dockerCommand(), instance.image(), instanceDir),
+              Duration.ofSeconds(30));
+      if (cleanup.exitCode() != 0) {
+        throw new IOException(
+            "Unable to clean Docker instance workspace for "
+                + name
+                + ": "
+                + cleanup.output());
+      }
+    }
     deleteTree(instanceDir);
 
     Map<String, Object> result = new LinkedHashMap<>();
