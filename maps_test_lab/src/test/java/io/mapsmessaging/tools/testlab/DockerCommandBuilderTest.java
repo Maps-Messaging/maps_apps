@@ -40,6 +40,9 @@ class DockerCommandBuilderTest {
     assertTrue(command.contains("--config"));
     assertTrue(command.contains("/opt/maps/config"));
     assertTrue(
+        command.contains(
+            "/srv/maps-test-lab/instances/ralf-a/config:/opt/maps/conf"));
+    assertTrue(
         command.stream()
             .anyMatch(
                 value ->
@@ -75,5 +78,28 @@ class DockerCommandBuilderTest {
     assertTrue(command.contains("mapsmessaging/server_daemon_local:latest"));
     assertFalse(command.contains("--config"));
     assertFalse(command.contains("/opt/maps/config"));
+    assertTrue(
+        command.contains(
+            "/srv/maps-test-lab/instances/maps-a/config:/opt/maps/conf"));
+  }
+
+  @Test
+  void buildsConfigurationSeedCommandsForMapsConf() {
+    List<String> create =
+        DockerCommandBuilder.seedCreateCommand(
+            "docker",
+            "maps-test-lab-maps-a-config-seed",
+            "mapsmessaging/server_daemon_local:latest");
+
+    List<String> copy =
+        DockerCommandBuilder.seedCopyCommand(
+            "docker",
+            "maps-test-lab-maps-a-config-seed",
+            Path.of("/srv/maps-test-lab/instances/maps-a/config"));
+
+    assertTrue(create.contains("create"));
+    assertTrue(create.contains("mapsmessaging/server_daemon_local:latest"));
+    assertTrue(copy.contains("maps-test-lab-maps-a-config-seed:/opt/maps/conf/."));
+    assertTrue(copy.contains("/srv/maps-test-lab/instances/maps-a/config"));
   }
 }
