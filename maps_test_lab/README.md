@@ -158,6 +158,8 @@ The lab creates the named Docker network when necessary and mounts:
 
 For Docker instances, if the per-instance config directory is empty on first start, the lab creates a temporary container from the configured image and copies the image's default `/opt/maps/conf` contents into the instance config directory before starting the real container. Existing configuration files are never overwritten by this seeding step.
 
+Before each Docker start, the lab also runs a short root container from the same image with the instance data directory mounted at `/opt/maps_data` and assigns that directory to `messaginguser:messaginggroup`. This preserves per-instance data isolation while ensuring MapsMessaging can create its lock and state files on host bind mounts.
+
 Additional application ports can be supplied through `ports` using normal Docker `host:container` notation.
 
 The image and `containerCommand` are intentionally configurable. The test lab does not assume a particular MapsMessaging image layout.
