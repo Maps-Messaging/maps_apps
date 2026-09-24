@@ -15,6 +15,7 @@ public record LabConfig(
     Path root,
     String bindAddress,
     int port,
+    String dockerCommand,
     String mqttPubCommand,
     String mqttSubCommand,
     Map<String, InstanceConfig> instances) {
@@ -23,20 +24,22 @@ public record LabConfig(
 
   public LabConfig {
     Objects.requireNonNull(root, "root");
-    bindAddress = bindAddress == null || bindAddress.isBlank() ? "127.0.0.1" : bindAddress;
+    bindAddress = blankDefault(bindAddress, "127.0.0.1");
     port = port <= 0 ? 8091 : port;
-    mqttPubCommand =
-        mqttPubCommand == null || mqttPubCommand.isBlank() ? "mosquitto_pub" : mqttPubCommand;
-    mqttSubCommand =
-        mqttSubCommand == null || mqttSubCommand.isBlank() ? "mosquitto_sub" : mqttSubCommand;
+    dockerCommand = blankDefault(dockerCommand, "docker");
+    mqttPubCommand = blankDefault(mqttPubCommand, "mosquitto_pub");
+    mqttSubCommand = blankDefault(mqttSubCommand, "mosquitto_sub");
     instances = instances == null ? Map.of() : Map.copyOf(instances);
 
     for (Map.Entry<String, InstanceConfig> entry : instances.entrySet()) {
       validateInstanceName(entry.getKey());
-      if (entry.getValue() == null
-          || entry.getValue().command() == null
-          || entry.getValue().command().isEmpty()) {
-        throw new IllegalArgumentException("Instance " + entry.getKey() + " has no command");
+      InstanceConfig instance = Objects.requireNonNull(entry.getValue(), "instance " + entry.getKey());
+      if ("docker".equals(instance.provider())) {
+        if (instance.image() == null || instance.image().isBlank()) {
+          throw new IllegalArgumentException("Docker instance " + entry.getKey() + " has no image");
+        }
+      } else if (instance.command().isEmpty()) {
+        throw new IllegalArgumentException("Process instance " + entry.getKey() + " has no command");
       }
     }
   }
@@ -65,16 +68,22 @@ public record LabConfig(
                 instanceConfigs.put(
                     name,
                     new InstanceConfig(
+                        instance.provider,
                         instance.command,
-                        instance.environment == null ? Map.of() : instance.environment,
+                        instance.environment,
                         instance.mqttHost,
-                        instance.mqttPort)));
+                        instance.mqttPort,
+                        instance.image,
+                        instance.network,
+                        instance.containerCommand,
+                        instance.ports)));
       }
 
       return new LabConfig(
           root.toAbsolutePath().normalize(),
           raw.bindAddress,
           raw.port,
+          raw.dockerCommand,
           raw.mqttPubCommand,
           raw.mqttSubCommand,
           instanceConfigs);
@@ -83,11 +92,11 @@ public record LabConfig(
 
   public InstanceConfig requireInstance(String name) {
     validateInstanceName(name);
-    InstanceConfig config = instances.get(name);
-    if (config == null) {
+    InstanceConfig instance = instances.get(name);
+    if (instance == null) {
       throw new IllegalArgumentException("Unknown instance: " + name);
     }
-    return config;
+    return instance;
   }
 
   public static void validateInstanceName(String name) {
@@ -96,17 +105,60 @@ public record LabConfig(
     }
   }
 
+  private static String blankDefault(String value, String fallback) {
+    return value == null || value.isBlank() ? fallback : value;
+  }
+
   public record InstanceConfig(
+      String provider,
       List<String> command,
       Map<String, String> environment,
       String mqttHost,
-      int mqttPort) {
+      int mqttPort,
+      String image,
+      String network,
+      List<String> containerCommand,
+      List<String> ports) {
 
     public InstanceConfig {
+      provider = blankDefault(provider, "process").toLowerCase();
+      if (!provider.equals("process") && !provider.equals("docker")) {
+        throw new IllegalArgumentException("Unsupported instance provider: " + provider);
+      }
       command = command == null ? List.of() : List.copyOf(command);
       environment = environment == null ? Map.of() : Map.copyOf(environment);
-      mqttHost = mqttHost == null || mqttHost.isBlank() ? "127.0.0.1" : mqttHost;
+      mqttHost = blankDefault(mqttHost, "127.0.0.1");
       mqttPort = mqttPort <= 0 ? 1883 : mqttPort;
+      image = image == null ? "" : image;
+      network = network == null ? "" : network;
+      containerCommand = containerCommand == null ? List.of() : List.copyOf(containerCommand);
+      ports = ports == null ? List.of() : List.copyOf(ports);
+    }
+
+    public static InstanceConfig process(
+        List<String> command, Map<String, String> environment, String mqttHost, int mqttPort) {
+      return new InstanceConfig(
+          "process", command, environment, mqttHost, mqttPort, "", "", List.of(), List.of());
+    }
+
+    public static InstanceConfig docker(
+        String image,
+        String network,
+        List<String> containerCommand,
+        List<String> ports,
+        Map<String, String> environment,
+        String mqttHost,
+        int mqttPort) {
+      return new InstanceConfig(
+          "docker",
+          List.of(),
+          environment,
+          mqttHost,
+          mqttPort,
+          image,
+          network,
+          containerCommand,
+          ports);
     }
   }
 
@@ -114,15 +166,21 @@ public record LabConfig(
     String root;
     String bindAddress;
     int port;
+    String dockerCommand;
     String mqttPubCommand;
     String mqttSubCommand;
     Map<String, RawInstance> instances;
   }
 
   private static final class RawInstance {
+    String provider;
     List<String> command;
     Map<String, String> environment;
     String mqttHost;
     int mqttPort;
+    String image;
+    String network;
+    List<String> containerCommand;
+    List<String> ports;
   }
 }
