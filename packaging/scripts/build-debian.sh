@@ -9,6 +9,7 @@ OUTPUT_DIR="${ROOT_DIR}/packaging/output"
 WORK_DIR="${ROOT_DIR}/packaging/work"
 
 LOGGER_MODULE="mqtt_logger"
+DEVELOPER_ONLY_MODULES=("maps_test_lab")
 LOGGER_INSTALL_SOURCE="${ROOT_DIR}/${LOGGER_MODULE}/install"
 LOGGER_SYSTEMD_SOURCE="${LOGGER_INSTALL_SOURCE}/systemd"
 LOGGER_CONFIG_DIR="/etc/maps-logger"
@@ -250,7 +251,25 @@ EOF_CONFFILES
   echo "Included MQTT logger systemd units and configuration"
 }
 
+is_developer_only_module() {
+  local candidate="$1"
+  local excluded
+
+  for excluded in "${DEVELOPER_ONLY_MODULES[@]}"; do
+    if [[ "${candidate}" == "${excluded}" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 for module in "${MODULES[@]}"; do
+  if is_developer_only_module "${module}"; then
+    echo "Excluded developer-only module ${module} from Debian package"
+    continue
+  fi
+
   jar_file="$(find_module_jar "${module}")"
   launcher_dir="${ROOT_DIR}/${module}/install/bin"
 

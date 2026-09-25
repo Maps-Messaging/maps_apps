@@ -13,6 +13,7 @@ Standalone operational and diagnostic applications for the [MapsMessaging](https
 | [`mavlink_tools`](mavlink_tools/README.md) | `maps-mavlink-replay`, `maps-mavlink-inspect`, `maps-mavlink-convert`, `maps-mavlink-tlog-tail`, `maps-mavlink-tlog-system-id` | Inspect, convert, extract, rewrite, and replay MAVLink captures |
 | `canbus_replay` | `maps-canbus-replay` | Replay NDJSON CAN records to SocketCAN |
 | `top` | `maps-top` | Display live Maps server statistics in a terminal |
+| [`maps_test_lab`](maps_test_lab/README.md) | source/build output only | MCP-controlled isolated MapsMessaging test lab; deliberately excluded from package installation |
 
 ## Build
 
