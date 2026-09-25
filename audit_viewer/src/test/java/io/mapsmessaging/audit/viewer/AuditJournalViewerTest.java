@@ -54,7 +54,7 @@ class AuditJournalViewerTest {
 
     assertEquals("Valid", records.get(0).getValidationMessage());
     assertEquals("Valid", records.get(1).getValidationMessage());
-    assertEquals("Valid", records.get(2).getValidationMessage());
+    assertEquals("Valid", records.get(2).getValidationMessage());\n    assertEquals("test-subject-1", records.get(0).getRawRecord().get("subject").getAsString());
   }
 
   @Test
