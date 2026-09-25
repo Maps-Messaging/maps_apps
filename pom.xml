@@ -88,7 +88,7 @@
         <dependency.check.autoUpdate>true</dependency.check.autoUpdate>
 
         <dependency.check.dataDirectory>${user.home}/.m2/repository/org/owasp/dependency-check-data/</dependency.check.dataDirectory>
-        <gpg.keyname>matthew.buckton@mapsmessaging.io</gpg.keyname>
+        <gpg.keyname>admin@mapsmessaging.io</gpg.keyname>
 
         <runSuite>**/*Suite.class</runSuite>
 
@@ -301,8 +301,12 @@
                             </goals>
                             <configuration>
                                 <keyname>${gpg.keyname}</keyname>
-                                <passphraseServerId>${gpg.keyname}</passphraseServerId>
-                            </configuration>
+              <passphraseEnvName>MAVEN_GPG_PASSPHRASE</passphraseEnvName>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+</configuration>
                         </execution>
                     </executions>
                 </plugin>
