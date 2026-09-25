@@ -7,6 +7,7 @@ Standalone operational and diagnostic applications for the [MapsMessaging](https
 | Module | Commands or services | Purpose |
 |---|---|---|
 | [`mqtt_logger`](mqtt_logger/README.md) | `maps-logger` | Subscribe to MAPS MQTT messages and write rotating CSV or NDJSON logs |
+| [`video_event_recorder`](video_event_recorder/README.md) | `maps-video-event-recorder` | Capture event-centred MediaMTX clips, upload them to S3, and publish generic recording results |
 | [`audit_viewer`](audit_viewer/README.md) | `maps-audit-viewer` | Read and verify tamper-evident Maps audit journals |
 | [`ndjson_viewer`](ndjson_viewer/README.md) | `maps-ndjson-viewer` | Query MAPS NDJSON message logs with embedded DuckDB and decoded payloads |
 | [`udp_helpers`](udp_helpers/README.md) | `maps-udp-capture`, `maps-udp-replay`, `maps-udp-stream-convert` | Capture, replay, and convert packet-oriented UDP streams |
