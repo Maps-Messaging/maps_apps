@@ -266,6 +266,7 @@ public class AuditJournalViewer {
         .message(getString(journalObject, "message"))
         .recordHash(getString(journalObject, "recordHash"))
         .previousRecordHash(getString(journalObject, "previousRecordHash"))
+        .rawRecord(journalObject.deepCopy())
         .status(AuditRecordVerificationStatus.INVALID)
         .validationMessage("Not verified")
         .build();
