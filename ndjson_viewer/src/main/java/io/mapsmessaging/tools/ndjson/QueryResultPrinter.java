@@ -23,15 +23,27 @@ final class QueryResultPrinter {
   private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 
   long print(ResultSet resultSet, QueryOutputFormat format, PrintWriter output) throws SQLException {
+    return print(resultSet, format, output, Long.MAX_VALUE);
+  }
+
+  long print(
+      ResultSet resultSet,
+      QueryOutputFormat format,
+      PrintWriter output,
+      long maxRows) throws SQLException {
+    if (maxRows < 0) {
+      throw new IllegalArgumentException("maxRows must be zero or greater");
+    }
     return switch (format) {
-      case TABLE -> printTable(resultSet, output);
-      case NDJSON -> printNdjson(resultSet, output);
-      case CSV -> printCsv(resultSet, output);
-      case RAW -> printRaw(resultSet, output);
+      case TABLE -> printTable(resultSet, output, maxRows);
+      case NDJSON -> printNdjson(resultSet, output, maxRows);
+      case CSV -> printCsv(resultSet, output, maxRows);
+      case RAW -> printRaw(resultSet, output, maxRows);
     };
   }
 
-  private long printTable(ResultSet resultSet, PrintWriter output) throws SQLException {
+  private long printTable(ResultSet resultSet, PrintWriter output, long maxRows)
+      throws SQLException {
     ResultSetMetaData metadata = resultSet.getMetaData();
     int columnCount = metadata.getColumnCount();
     String[] headings = new String[columnCount];
@@ -42,7 +54,7 @@ final class QueryResultPrinter {
     output.println("-".repeat(Math.min(240, String.join(" | ", headings).length())));
 
     long rows = 0;
-    while (resultSet.next()) {
+    while (rows < maxRows && resultSet.next()) {
       String[] values = new String[columnCount];
       for (int column = 1; column <= columnCount; column++) {
         values[column - 1] = truncate(toDisplayValue(resultSet.getObject(column)));
@@ -55,11 +67,12 @@ final class QueryResultPrinter {
     return rows;
   }
 
-  private long printNdjson(ResultSet resultSet, PrintWriter output) throws SQLException {
+  private long printNdjson(ResultSet resultSet, PrintWriter output, long maxRows)
+      throws SQLException {
     ResultSetMetaData metadata = resultSet.getMetaData();
     int columnCount = metadata.getColumnCount();
     long rows = 0;
-    while (resultSet.next()) {
+    while (rows < maxRows && resultSet.next()) {
       JsonObject row = new JsonObject();
       for (int column = 1; column <= columnCount; column++) {
         addJsonValue(
@@ -75,7 +88,8 @@ final class QueryResultPrinter {
     return rows;
   }
 
-  private long printCsv(ResultSet resultSet, PrintWriter output) throws SQLException {
+  private long printCsv(ResultSet resultSet, PrintWriter output, long maxRows)
+      throws SQLException {
     ResultSetMetaData metadata = resultSet.getMetaData();
     int columnCount = metadata.getColumnCount();
     for (int column = 1; column <= columnCount; column++) {
@@ -87,7 +101,7 @@ final class QueryResultPrinter {
     output.println();
 
     long rows = 0;
-    while (resultSet.next()) {
+    while (rows < maxRows && resultSet.next()) {
       for (int column = 1; column <= columnCount; column++) {
         if (column > 1) {
           output.print(',');
@@ -101,7 +115,8 @@ final class QueryResultPrinter {
     return rows;
   }
 
-  private long printRaw(ResultSet resultSet, PrintWriter output) throws SQLException {
+  private long printRaw(ResultSet resultSet, PrintWriter output, long maxRows)
+      throws SQLException {
     ResultSetMetaData metadata = resultSet.getMetaData();
     if (metadata.getColumnCount() != 1) {
       throw new IllegalArgumentException("Raw output requires exactly one selected column");
@@ -109,7 +124,7 @@ final class QueryResultPrinter {
 
     boolean json = "JSON".equalsIgnoreCase(metadata.getColumnTypeName(1));
     long rows = 0;
-    while (resultSet.next()) {
+    while (rows < maxRows && resultSet.next()) {
       Object value = resultSet.getObject(1);
       if (value == null) {
         output.println("null");

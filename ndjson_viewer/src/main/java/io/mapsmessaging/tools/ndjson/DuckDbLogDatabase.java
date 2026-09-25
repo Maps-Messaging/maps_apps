@@ -67,9 +67,70 @@ final class DuckDbLogDatabase implements AutoCloseable {
     }
   }
 
+  DatabaseSummary databaseSummary() throws SQLException {
+    List<TableName> tables = new java.util.ArrayList<>();
+    try (Statement statement = connection.createStatement();
+         ResultSet resultSet = statement.executeQuery(
+             "SELECT table_catalog, table_schema, table_name "
+                 + "FROM information_schema.tables "
+                 + "WHERE table_type = 'BASE TABLE' "
+                 + "AND table_schema NOT IN ('information_schema', 'pg_catalog') "
+                 + "ORDER BY table_catalog, table_schema, table_name")) {
+      while (resultSet.next()) {
+        tables.add(
+            new TableName(
+                resultSet.getString("table_catalog"),
+                resultSet.getString("table_schema"),
+                resultSet.getString("table_name")));
+      }
+    }
+
+    long records = 0;
+    for (TableName table : tables) {
+      String qualifiedName =
+          quoteIdentifier(table.catalog())
+              + "."
+              + quoteIdentifier(table.schema())
+              + "."
+              + quoteIdentifier(table.name());
+      try (Statement statement = connection.createStatement();
+           ResultSet resultSet = statement.executeQuery("SELECT count(*) FROM " + qualifiedName)) {
+        resultSet.next();
+        records += resultSet.getLong(1);
+      }
+    }
+    List<String> names = tables.stream()
+        .map(TableName::displayName)
+        .toList();
+    return new DatabaseSummary(tables.size(), records, names);
+  }
+
+  record DatabaseSummary(int tableCount, long recordCount, List<String> tableNames) {}
+
+  private record TableName(String catalog, String schema, String name) {
+    String displayName() {
+      return "main".equalsIgnoreCase(schema) ? name : schema + "." + name;
+    }
+  }
+
+  private String quoteIdentifier(String value) {
+    return "\"" + value.replace("\"", "\"\"") + "\"";
+  }
+
   Query query(String sql) throws SQLException {
+    return query(sql, 0);
+  }
+
+  Query query(String sql, int maxRows) throws SQLException {
+    if (maxRows < 0) {
+      throw new IllegalArgumentException("maxRows must be zero or greater");
+    }
+
     Statement statement = connection.createStatement();
     try {
+      if (maxRows > 0) {
+        statement.setMaxRows(maxRows);
+      }
       boolean hasResultSet = statement.execute(sql);
       ResultSet resultSet = hasResultSet ? statement.getResultSet() : null;
       return new Query(statement, resultSet, statement.getLargeUpdateCount());

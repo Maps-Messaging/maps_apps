@@ -121,4 +121,65 @@ class NdjsonViewerArgumentsTest {
             NdjsonViewerArguments.parse(
                 new String[] {"log.ndjson", "-ui", "--topics"}));
   }
+
+  @Test
+  void enablesMcpMode() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(new String[] {"--database", "analysis.duckdb", "--mcp"});
+
+    assertTrue(arguments.mcp());
+  }
+
+  @Test
+  void rejectsMcpWithAnotherOperation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            NdjsonViewerArguments.parse(
+                new String[] {"log.ndjson", "--mcp", "--topics"}));
+  }
+
+  @Test
+  void enablesMcpHttpWithDefaults() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(
+            new String[] {"--database", "analysis.duckdb", "--mcp-http"});
+
+    assertTrue(arguments.mcpHttp());
+    assertEquals(NdjsonViewerArguments.DEFAULT_MCP_BIND, arguments.mcpBind());
+    assertEquals(NdjsonViewerArguments.DEFAULT_MCP_PORT, arguments.mcpPort());
+  }
+
+  @Test
+  void parsesMcpHttpBindAndPort() {
+    NdjsonViewerArguments arguments =
+        NdjsonViewerArguments.parse(
+            new String[] {
+                "--database", "analysis.duckdb",
+                "--mcp-http", "--bind", "0.0.0.0", "--port", "9000"
+            });
+
+    assertEquals("0.0.0.0", arguments.mcpBind());
+    assertEquals(9000, arguments.mcpPort());
+  }
+
+  @Test
+  void rejectsNetworkOptionsWithoutMcpHttp() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            NdjsonViewerArguments.parse(
+                new String[] {"--database", "analysis.duckdb", "--port", "9000"}));
+  }
+
+  @Test
+  void rejectsInvalidMcpHttpPort() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            NdjsonViewerArguments.parse(
+                new String[] {
+                    "--database", "analysis.duckdb", "--mcp-http", "--port", "70000"
+                }));
+  }
 }

@@ -14,7 +14,14 @@ record NdjsonViewerArguments(
     QueryOutputFormat format,
     boolean topics,
     boolean interactive,
-    boolean ui) {
+    boolean ui,
+    boolean mcp,
+    boolean mcpHttp,
+    String mcpBind,
+    int mcpPort) {
+
+  static final String DEFAULT_MCP_BIND = "127.0.0.1";
+  static final int DEFAULT_MCP_PORT = 8090;
 
   static NdjsonViewerArguments parse(String[] args) {
     if (args.length == 0) {
@@ -29,6 +36,12 @@ record NdjsonViewerArguments(
     boolean topics = false;
     boolean interactive = false;
     boolean ui = false;
+    boolean mcp = false;
+    boolean mcpHttp = false;
+    String mcpBind = DEFAULT_MCP_BIND;
+    int mcpPort = DEFAULT_MCP_PORT;
+    boolean bindConfigured = false;
+    boolean portConfigured = false;
 
     int firstOption = 0;
     if (!args[0].startsWith("-")) {
@@ -47,6 +60,16 @@ record NdjsonViewerArguments(
         case "--topics" -> topics = true;
         case "--interactive" -> interactive = true;
         case "-ui", "--ui" -> ui = true;
+        case "--mcp" -> mcp = true;
+        case "--mcp-http" -> mcpHttp = true;
+        case "--bind" -> {
+          mcpBind = requireValue(args, ++index, option);
+          bindConfigured = true;
+        }
+        case "--port" -> {
+          mcpPort = parsePort(requireValue(args, ++index, option));
+          portConfigured = true;
+        }
         case "--help", "-h" -> throw new HelpRequestedException();
         default -> throw new IllegalArgumentException("Unknown option: " + option);
       }
@@ -56,19 +79,41 @@ record NdjsonViewerArguments(
       throw new IllegalArgumentException(
           "Either an input file/directory or --database <file> is required");
     }
+    if (mcpBind.isBlank()) {
+      throw new IllegalArgumentException("--bind must not be empty");
+    }
+    if ((bindConfigured || portConfigured) && !mcpHttp) {
+      throw new IllegalArgumentException("--bind and --port require --mcp-http");
+    }
 
     int operationCount =
-        (topics ? 1 : 0) + (sql == null ? 0 : 1) + (interactive ? 1 : 0) + (ui ? 1 : 0);
+        (topics ? 1 : 0)
+            + (sql == null ? 0 : 1)
+            + (interactive ? 1 : 0)
+            + (ui ? 1 : 0)
+            + (mcp ? 1 : 0)
+            + (mcpHttp ? 1 : 0);
     if (operationCount > 1) {
       throw new IllegalArgumentException(
-          "--topics, --sql, --interactive and -ui/--ui are mutually exclusive");
+          "--topics, --sql, --interactive, -ui/--ui, --mcp and --mcp-http are mutually exclusive");
     }
     if (output != null && format == QueryOutputFormat.TABLE) {
       format = inferOutputFormat(output);
     }
 
     return new NdjsonViewerArguments(
-        input, database, output, sql, format, topics, interactive, ui);
+        input,
+        database,
+        output,
+        sql,
+        format,
+        topics,
+        interactive,
+        ui,
+        mcp,
+        mcpHttp,
+        mcpBind,
+        mcpPort);
   }
 
   private static String requireValue(String[] args, int index, String option) {
@@ -76,6 +121,18 @@ record NdjsonViewerArguments(
       throw new IllegalArgumentException("Missing value for " + option);
     }
     return args[index];
+  }
+
+  private static int parsePort(String value) {
+    try {
+      int port = Integer.parseInt(value);
+      if (port < 1 || port > 65535) {
+        throw new IllegalArgumentException("--port must be between 1 and 65535");
+      }
+      return port;
+    } catch (NumberFormatException exception) {
+      throw new IllegalArgumentException("Invalid port: " + value);
+    }
   }
 
   private static QueryOutputFormat inferOutputFormat(Path output) {

@@ -47,6 +47,55 @@ class DuckDbLogDatabaseTest {
   }
 
   @Test
+  void reportsLoadedRecordCount() throws Exception {
+    Path input = temporaryDirectory.resolve("maps.ndjson");
+    Files.writeString(
+        input,
+        envelope("4817/task", "{\"state\":\"ACTIVE\"}")
+            + envelope("mavlink/1/HEARTBEAT", "{\"mode\":\"AUTO\"}"));
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(null)) {
+      database.load(List.of(input));
+
+      var summary = database.databaseSummary();
+      assertEquals(1, summary.tableCount());
+      assertEquals(2, summary.recordCount());
+    }
+  }
+
+  @Test
+  void reportsRecordsAcrossArbitraryBaseTables() throws Exception {
+    Path databasePath = temporaryDirectory.resolve("arbitrary.duckdb");
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
+      executeStatement(database, "CREATE TABLE alpha AS SELECT 1 AS value UNION ALL SELECT 2");
+      executeStatement(database, "CREATE TABLE beta AS SELECT 3 AS value");
+      executeStatement(database, "CREATE VIEW combined AS SELECT * FROM alpha UNION ALL SELECT * FROM beta");
+
+      var summary = database.databaseSummary();
+      assertEquals(2, summary.tableCount());
+      assertEquals(3, summary.recordCount());
+      assertTrue(summary.tableNames().contains("alpha"));
+      assertTrue(summary.tableNames().contains("beta"));
+      assertFalse(summary.tableNames().contains("combined"));
+    }
+  }
+
+  @Test
+  void reportsZeroForDatabaseWithoutBaseTables() throws Exception {
+    Path databasePath = temporaryDirectory.resolve("views-only.duckdb");
+
+    try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath)) {
+      executeStatement(database, "CREATE VIEW only_view AS SELECT 1 AS value");
+
+      var summary = database.databaseSummary();
+      assertEquals(0, summary.tableCount());
+      assertEquals(0, summary.recordCount());
+      assertTrue(summary.tableNames().isEmpty());
+    }
+  }
+
+  @Test
   void invalidBase64DoesNotAbortImport() throws Exception {
     Path input = temporaryDirectory.resolve("maps.ndjson");
     Files.writeString(input, "{\"topic\":\"mavlink/1/STATUSTEXT\",\"opaqueData\":\"not base64!\"}\n");
