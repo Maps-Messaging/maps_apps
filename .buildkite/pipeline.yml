@@ -6,7 +6,7 @@ steps:
     command:
       - "export SONAR_TOKEN=$(buildkite-agent secret get SONAR_TOKEN)"
       - "mvn --batch-mode clean verify"
-      - "mvn --batch-mode org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar -Dsonar.token=${SONAR_TOKEN} -Dsonar.projectKey=Maps-Messaging_maps_apps"
+      - "mvn --batch-mode org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar -Dsonar.token=${SONAR_TOKEN} -Dsonar.projectKey=Maps-Messaging_maps_apps -Dsonar.branch.name=development"
     artifact_paths:
       - "*/target/*.jar"
     agents:
