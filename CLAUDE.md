@@ -67,25 +67,24 @@ All configuration is read from `/etc/maps-logger/env` (native) or `docker-compos
 
 | Variable | Default | Description |
 |---|---|---|
-| `MAPS_LOGGER_URL` | *(required)* | MQTT broker URL — must be `tcp://127.0.0.1:1883` |
-| `MAPS_LOGGER_TOPIC` | `/#` | Topic filter |
+| `MAPS_LOGGER_URL` | *(required)* | MQTT broker URL, `tcp://` or `ssl://` |
+| `MAPS_LOGGER_TOPIC` | `#` | Topic filter(s), comma-separated |
 | `MAPS_LOGGER_QOS` | `1` | MQTT QoS: 0, 1, or 2 |
 | `MAPS_LOGGER_FORMAT` | `csv` | `csv` or `json` (json → `.ndjson` files) |
 | `MAPS_LOGGER_OUTPUT_DIR` | `/var/log/maps-logger` | Rolling output directory |
 | `MAPS_LOGGER_DISK_WARN_MB` | `500` | Free-space warning threshold |
+| `MAPS_LOGGER_USERNAME` / `MAPS_LOGGER_PASSWORD_FILE` | — | Broker credentials; password only from a file |
+| `MAPS_LOGGER_KEYSTORE` / `MAPS_LOGGER_TRUSTSTORE` (+ `*_PASSWORD_FILE`) | — | Mutual TLS material; requires `ssl://` |
+
+Secrets are only ever read from files (`ConnectionSecurity`), re-read on each reconnect. The
+service runs as the `maps-logger` account; `LogFiles` creates directories `0750` and files `0640`.
 
 ### MAPS server prerequisite
 
-The MAPS server YAML must include (see `install/maps-config-snippet.yaml`):
-
-```yaml
-transformations:
-  data:
-    - pattern: "*://*/*/*"
-      transformation: ""
-    - pattern: "tcp://127.0.0.1/*/*"
-      transformation: "Message-JSON"
-```
+None. The logger appends `?Transformation=Message-JSON` to its MQTT client id and MAPS applies
+the transformation to that connection only. Never add a host-wide `tcp://127.0.0.1/*/*` rule:
+it breaks every other local MQTT client. An account-scoped rule is in
+`install/maps-config-snippet.yaml`.
 
 ## Architecture
 

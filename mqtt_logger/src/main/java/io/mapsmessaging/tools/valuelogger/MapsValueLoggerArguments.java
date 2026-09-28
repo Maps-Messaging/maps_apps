@@ -1,5 +1,9 @@
 package io.mapsmessaging.tools.valuelogger;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import lombok.Getter;
 
@@ -7,28 +11,50 @@ import lombok.Getter;
 public class MapsValueLoggerArguments {
 
   private final String url;
-  private final String topic;
+  private final List<String> topics;
   private final int qos;
   private final String outputFileName;
   private final String outputDir;
   private final OutputFormat outputFormat;
   private final int diskWarnMb;
+  private final String username;
+  private final String passwordFile;
+  private final String keyStore;
+  private final String keyStorePasswordFile;
+  private final String trustStore;
+  private final String trustStorePasswordFile;
 
   private MapsValueLoggerArguments(
       String url,
-      String topic,
+      List<String> topics,
       int qos,
       String outputFileName,
       String outputDir,
       OutputFormat outputFormat,
-      int diskWarnMb) {
+      int diskWarnMb,
+      String username,
+      String passwordFile,
+      String keyStore,
+      String keyStorePasswordFile,
+      String trustStore,
+      String trustStorePasswordFile) {
     this.url = url;
-    this.topic = topic;
+    this.topics = topics;
     this.qos = qos;
     this.outputFileName = outputFileName;
     this.outputDir = outputDir;
     this.outputFormat = outputFormat;
     this.diskWarnMb = diskWarnMb;
+    this.username = username;
+    this.passwordFile = passwordFile;
+    this.keyStore = keyStore;
+    this.keyStorePasswordFile = keyStorePasswordFile;
+    this.trustStore = trustStore;
+    this.trustStorePasswordFile = trustStorePasswordFile;
+  }
+
+  public boolean isTlsUrl() {
+    return url.regionMatches(true, 0, "ssl://", 0, "ssl://".length());
   }
 
   public static MapsValueLoggerArguments parse(String[] args) {
@@ -43,6 +69,12 @@ public class MapsValueLoggerArguments {
     String outputDir = null;
     OutputFormat requestedOutputFormat = null;
     Integer diskWarnMb = null;
+    String username = null;
+    String passwordFile = null;
+    String keyStore = null;
+    String keyStorePasswordFile = null;
+    String trustStore = null;
+    String trustStorePasswordFile = null;
 
     for (int index = 0; index < args.length; index++) {
       String argument = args[index];
@@ -74,6 +106,30 @@ public class MapsValueLoggerArguments {
 
         case "--disk-warn-mb":
           diskWarnMb = parseDiskWarnMb(readRequiredValue(args, ++index, "--disk-warn-mb"));
+          break;
+
+        case "--username":
+          username = readRequiredValue(args, ++index, "--username");
+          break;
+
+        case "--password-file":
+          passwordFile = readRequiredValue(args, ++index, "--password-file");
+          break;
+
+        case "--keystore":
+          keyStore = readRequiredValue(args, ++index, "--keystore");
+          break;
+
+        case "--keystore-password-file":
+          keyStorePasswordFile = readRequiredValue(args, ++index, "--keystore-password-file");
+          break;
+
+        case "--truststore":
+          trustStore = readRequiredValue(args, ++index, "--truststore");
+          break;
+
+        case "--truststore-password-file":
+          trustStorePasswordFile = readRequiredValue(args, ++index, "--truststore-password-file");
           break;
 
         default:
@@ -118,6 +174,13 @@ public class MapsValueLoggerArguments {
       diskWarnMb = (envWarn != null) ? parseDiskWarnMb(envWarn) : 500;
     }
 
+    username = fallback(username, env, "MAPS_LOGGER_USERNAME");
+    passwordFile = fallback(passwordFile, env, "MAPS_LOGGER_PASSWORD_FILE");
+    keyStore = fallback(keyStore, env, "MAPS_LOGGER_KEYSTORE");
+    keyStorePasswordFile = fallback(keyStorePasswordFile, env, "MAPS_LOGGER_KEYSTORE_PASSWORD_FILE");
+    trustStore = fallback(trustStore, env, "MAPS_LOGGER_TRUSTSTORE");
+    trustStorePasswordFile = fallback(trustStorePasswordFile, env, "MAPS_LOGGER_TRUSTSTORE_PASSWORD_FILE");
+
     if (url == null || url.isBlank()) {
       throw new IllegalArgumentException("Missing required argument: --url (or set MAPS_LOGGER_URL)");
     }
@@ -126,23 +189,86 @@ public class MapsValueLoggerArguments {
         ? (requestedOutputFormat != null ? requestedOutputFormat : OutputFormat.CSV)
         : OutputFormat.resolve(outputFileName, requestedOutputFormat);
 
-    return new MapsValueLoggerArguments(url, topic, qos, outputFileName, outputDir,
-        resolvedFormat, diskWarnMb);
+    MapsValueLoggerArguments arguments = new MapsValueLoggerArguments(url, parseTopics(topic), qos,
+        outputFileName, outputDir, resolvedFormat, diskWarnMb, username, passwordFile, keyStore,
+        keyStorePasswordFile, trustStore, trustStorePasswordFile);
+    arguments.validateSecurity();
+    return arguments;
+  }
+
+  private void validateSecurity() {
+    if (passwordFile != null && username == null) {
+      throw new IllegalArgumentException("--password-file requires --username");
+    }
+
+    if ((keyStore != null || trustStore != null) && !isTlsUrl()) {
+      throw new IllegalArgumentException("--keystore and --truststore require an ssl:// URL");
+    }
+
+    if (keyStore != null && keyStorePasswordFile == null) {
+      throw new IllegalArgumentException("--keystore requires --keystore-password-file");
+    }
+
+    if (trustStore != null && trustStorePasswordFile == null) {
+      throw new IllegalArgumentException("--truststore requires --truststore-password-file");
+    }
+
+    requireReadable(passwordFile, "--password-file");
+    requireReadable(keyStore, "--keystore");
+    requireReadable(keyStorePasswordFile, "--keystore-password-file");
+    requireReadable(trustStore, "--truststore");
+    requireReadable(trustStorePasswordFile, "--truststore-password-file");
+  }
+
+  private static void requireReadable(String file, String name) {
+    if (file != null && !Files.isReadable(Path.of(file))) {
+      throw new IllegalArgumentException(name + " is not a readable file: " + file);
+    }
+  }
+
+  private static String fallback(String value, Function<String, String> env, String name) {
+    if (value != null) {
+      return value;
+    }
+
+    String envValue = env.apply(name);
+    return (envValue == null || envValue.isBlank()) ? null : envValue;
+  }
+
+  private static List<String> parseTopics(String topicText) {
+    List<String> parsed = Arrays.stream(topicText.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .toList();
+
+    if (parsed.isEmpty()) {
+      throw new IllegalArgumentException("--topic must contain at least one topic filter");
+    }
+
+    return parsed;
   }
 
   public static void printUsage() {
     System.err.println("Usage:");
     System.err.println(
-        "  maps-value-logger --url <url> [--topic <topic>] [--qos <0|1|2>]");
+        "  maps-value-logger --url <url> [--topic <topic>[,<topic>...]] [--qos <0|1|2>]");
     System.err.println(
         "    [--format <csv|json>] [--output <file> | --output-dir <dir>]");
     System.err.println(
-        "    [--disk-warn-mb <mb>]");
+        "    [--disk-warn-mb <mb>] [--username <name> [--password-file <file>]]");
+    System.err.println(
+        "    [--keystore <p12> --keystore-password-file <file>]");
+    System.err.println(
+        "    [--truststore <p12> --truststore-password-file <file>]");
     System.err.println();
     System.err.println(
         "Environment variables: MAPS_LOGGER_URL, MAPS_LOGGER_TOPIC, MAPS_LOGGER_QOS, MAPS_LOGGER_FORMAT,");
     System.err.println(
-        "  MAPS_LOGGER_OUTPUT_DIR, MAPS_LOGGER_DISK_WARN_MB");
+        "  MAPS_LOGGER_OUTPUT_DIR, MAPS_LOGGER_DISK_WARN_MB, MAPS_LOGGER_USERNAME,");
+    System.err.println(
+        "  MAPS_LOGGER_PASSWORD_FILE, MAPS_LOGGER_KEYSTORE, MAPS_LOGGER_KEYSTORE_PASSWORD_FILE,");
+    System.err.println(
+        "  MAPS_LOGGER_TRUSTSTORE, MAPS_LOGGER_TRUSTSTORE_PASSWORD_FILE");
   }
 
   private static String readRequiredValue(String[] args, int index, String name) {

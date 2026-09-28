@@ -32,6 +32,8 @@ public class NdjsonLogWriter implements LogWriter {
 
     Path outputPath = Path.of(outputFileName);
 
+    LogFiles.createFileIfAbsent(outputPath);
+
     writer = Files.newBufferedWriter(
         outputPath,
         StandardCharsets.UTF_8,

@@ -6,6 +6,8 @@ SERVICE_DIR="/etc/systemd/system"
 CONF_DIR="/etc/maps-logger"
 LIB_DIR="/usr/lib/maps-logger"
 LOG_DIR="/var/log/maps-logger"
+CREDENTIALS_DIR="$CONF_DIR/credentials"
+SERVICE_USER="maps-logger"
 
 # ---- Checks ----------------------------------------------------------------
 
@@ -39,8 +41,22 @@ fi
 
 # ---- Install ---------------------------------------------------------------
 
+echo "Creating service account..."
+if ! getent passwd "$SERVICE_USER" >/dev/null; then
+  useradd --system --user-group --no-create-home --home-dir /nonexistent \
+    --shell /usr/sbin/nologin "$SERVICE_USER"
+  echo "  Created system user $SERVICE_USER"
+fi
+
 echo "Creating directories..."
-mkdir -p "$LIB_DIR" "$CONF_DIR" "$LOG_DIR"
+mkdir -p "$LIB_DIR" "$CONF_DIR"
+mkdir -p "$LOG_DIR"
+# Earlier versions ran as root: hand existing logs to the service account and
+# drop world access, since the files carry full message payloads.
+chown -R "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
+chmod -R o-rwx "$LOG_DIR"
+chmod 0750 "$LOG_DIR"
+install -d -m 0750 -o root -g "$SERVICE_USER" "$CREDENTIALS_DIR"
 
 echo "Installing JAR: $(basename "$JAR_FILE")"
 cp "$JAR_FILE" "$LIB_DIR/maps-value-logger.jar"
@@ -73,9 +89,9 @@ echo ""
 echo "Installation complete."
 echo ""
 echo "Next steps:"
-echo "  1. Add the MAPS server transformation config from:"
-echo "       $INSTALL_DIR/maps-config-snippet.yaml"
-echo "  2. Edit $CONF_DIR/env to set MAPS_URL and other settings."
+echo "  1. Edit $CONF_DIR/env to set MAPS_LOGGER_URL and other settings."
+echo "  2. Optional: put credentials in $CREDENTIALS_DIR (root:$SERVICE_USER, mode 0640)"
+echo "     and reference them from $CONF_DIR/env."
 echo "  3. Start the logger: systemctl start maps-logger"
 echo "  4. Check status:     systemctl status maps-logger"
 echo "  5. View logs:        journalctl -u maps-logger -f"

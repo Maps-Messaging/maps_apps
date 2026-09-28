@@ -2,7 +2,6 @@ package io.mapsmessaging.tools.valuelogger;
 
 import com.google.gson.JsonObject;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneOffset;
@@ -43,7 +42,7 @@ public class RollingLogWriter implements LogWriter {
 
   @Override
   public synchronized void open() throws Exception {
-    Files.createDirectories(outputDir);
+    LogFiles.createDirectories(outputDir);
     currentHourTag = HOUR_FORMATTER.format(clock.instant());
     currentWriter = createWriter(currentHourTag);
     currentWriter.open();

@@ -5,10 +5,28 @@ Description=Compress old MAPS Logger output files
 Type=oneshot
 # "-" prefix: a missing env file (fresh install ordering) must not fail the timer.
 EnvironmentFile=-/etc/maps-logger/env
-ExecStart=/bin/bash -c 'CURRENT="maps-$(date -u +%%Y-%%m-%%d-%%H)"; find /var/log/maps-logger -name "*.csv" -mmin +120 ! -name "*.gz" ! -name "${CURRENT}.csv" -exec gzip -f {} \;'
-ExecStart=/bin/bash -c 'CURRENT="maps-$(date -u +%%Y-%%m-%%d-%%H)"; find /var/log/maps-logger -name "*.ndjson" -mmin +120 ! -name "*.gz" ! -name "${CURRENT}.ndjson" -exec gzip -f {} \;'
+User=maps-logger
+Group=maps-logger
+LogsDirectory=maps-logger
+LogsDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+
+# systemd expands ${VAR} inside ExecStart itself, so every shell variable and
+# command substitution below is written as $$ to reach bash unchanged.
+#
+# Closed hourly files are gzipped, and each new archive's SHA-256 is appended to
+# SHA256SUMS. Copy SHA256SUMS off-host with the archives; `sha256sum -c` then
+# shows whether an archive changed after it was closed.
+ExecStart=/bin/bash -c 'cd /var/log/maps-logger || exit 0; CURRENT="maps-$$(date -u +%%Y-%%m-%%d-%%H)"; find . -maxdepth 1 -type f \\( -name "*.csv" -o -name "*.ndjson" \\) -mmin +120 ! -name "$${CURRENT}.csv" ! -name "$${CURRENT}.ndjson" -print0 | while IFS= read -r -d "" file; do gzip -f "$$file" && sha256sum "$${file#./}.gz" >> SHA256SUMS; done'
 # Retention: prune compressed files older than MAPS_LOGGER_RETENTION_DAYS
 # (0/unset = keep forever — the pre-retention behaviour). bash-level default
 # because an env file preserved from an older package (--force-confold)
 # will not contain the variable.
-ExecStart=/bin/bash -c 'd="$${MAPS_LOGGER_RETENTION_DAYS:-0}"; [ "$d" -gt 0 ] 2>/dev/null && find /var/log/maps-logger -name "*.gz" -mtime +"$d" -delete || true'
+ExecStart=/bin/bash -c 'd="$${MAPS_LOGGER_RETENTION_DAYS:-0}"; [ "$$d" -gt 0 ] 2>/dev/null && find /var/log/maps-logger -name "*.gz" -mtime +"$$d" -delete || true'

@@ -19,8 +19,32 @@ upgrade, the package restarts it to load the new JAR.
 .PP
 A separate timer,
 .BR maps-logger-compress.timer ,
-runs hourly and compresses CSV and NDJSON files older than two hours.  Files are not deleted
-automatically.
+runs hourly, compresses CSV and NDJSON files older than two hours and appends each archive's
+SHA-256 to
+.IR SHA256SUMS .
+Files are not deleted unless
+.B MAPS_LOGGER_RETENTION_DAYS
+is set.
+.SH SECURITY
+Both units run as the unprivileged
+.B maps-logger
+account created by the package, with systemd sandboxing and a umask of 0027.  Output files
+carry full message payloads, so the output directory is 0750 and files are 0640; add analysts
+to the
+.B maps-logger
+group to grant read access.  Upgrading from a version that ran as root moves existing files to
+the service account.
+.PP
+Broker passwords and keystore passwords are read only from files referenced in
+.IR /etc/maps-logger/env ;
+see
+.BR maps-logger.env (5).
+When the broker runs on the same host, the logger can be confined to loopback with
+.B systemctl edit maps-logger
+and
+.B IPAddressDeny=any
+plus
+.BR IPAddressAllow=localhost .
 .SH INITIAL SETUP
 Edit the service environment:
 .PP
@@ -34,8 +58,9 @@ Start the logger:
 sudo systemctl start maps-logger
 .EE
 .PP
-The Maps server should transform local MQTT deliveries to Message-JSON so that envelope
-timestamps, QoS, protocol, session, and metadata fields are available to the logger.
+The logger requests the Message-JSON transformation through its MQTT client id, so envelope
+timestamps, QoS, protocol, session, and metadata fields are available without server-wide
+transformation rules.
 .SH SERVICE MANAGEMENT
 .TP
 Check service status:
@@ -75,8 +100,9 @@ The logger records local receive time, server timestamp, server time in millisec
 calculated latency, topic, content type, identifier, QoS, protocol, session identifier, and
 metadata version.
 .SH DIAGNOSTICS
-If output records contain missing timestamps or metadata, verify the Maps server has a
-Message-JSON transformation for local MQTT connections.
+If output records contain missing timestamps or metadata, verify that no Maps server
+transformation rule overrides Message-JSON for the logger's connection.  Authentication and
+TLS handshake failures are reported in the service journal.
 .PP
 To inspect recent failures:
 .PP
@@ -95,8 +121,17 @@ Logger executable installed by the maps-apps Debian package.
 .I /etc/maps-logger/env
 Service configuration.
 .TP
+.I /etc/maps-logger/credentials/
+Credential files; owned
+.B root:maps-logger
+with mode 0750.
+.TP
 .I /var/log/maps-logger/
-Default output directory.
+Default output directory, owned by
+.BR maps-logger .
+.TP
+.I /var/log/maps-logger/SHA256SUMS
+SHA-256 checksums of compressed archives.
 .TP
 .I /lib/systemd/system/maps-logger.service
 Logger systemd unit.

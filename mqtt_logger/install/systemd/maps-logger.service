@@ -13,10 +13,43 @@ RestartSec=10s
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=maps-logger
+
+# Run unprivileged. The account is created by the installer; systemd creates
+# /var/log/maps-logger owned by it. Log files carry full message payloads, so
+# they are readable by the maps-logger group only (add analysts to that group).
+User=maps-logger
+Group=maps-logger
+LogsDirectory=maps-logger
+LogsDirectoryMode=0750
+UMask=0027
+
+# Sandboxing. Secrets (password/keystore files referenced from the env file)
+# are expected below /etc/maps-logger, which stays readable.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
+PrivateDevices=true
+ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+# When the broker is on this host, the logger can be confined to loopback:
+#   systemctl edit maps-logger   and add
+#   [Service]
+#   IPAddressDeny=any
+#   IPAddressAllow=localhost
 
 [Install]
 WantedBy=multi-user.target
