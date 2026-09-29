@@ -371,6 +371,10 @@ chmod 0755 \
   "${PACKAGE_CONTROL_DIR}/prerm" \
   "${PACKAGE_CONTROL_DIR}/postrm"
 
+# Directory modes must not depend on the build host's umask (e.g. 002 would
+# ship group-writable /etc/maps-logger).
+find "${PACKAGE_ROOT}" -type d -exec chmod 0755 {} +
+
 OUTPUT_FILE="${OUTPUT_DIR}/${PACKAGE_NAME}_${DEBIAN_VERSION}_${ARCHITECTURE}.deb"
 rm -f "${OUTPUT_FILE}"
 

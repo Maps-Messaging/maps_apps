@@ -9,6 +9,8 @@ Type=simple
 EnvironmentFile=/etc/maps-logger/env
 ExecStart=java -jar /usr/lib/maps-logger/maps-value-logger.jar
 Restart=on-failure
+# The JVM exits with 143 on SIGTERM; a normal stop is not a failure.
+SuccessExitStatus=143
 RestartSec=10s
 StandardOutput=journal
 StandardError=journal
