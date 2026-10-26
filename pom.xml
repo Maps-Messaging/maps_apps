@@ -24,7 +24,7 @@
 
     <groupId>io.mapsmessaging</groupId>
     <artifactId>maps_apps</artifactId>
-    <version>4.5.0</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>Maps Apps</name>
@@ -40,7 +40,6 @@
         <module>mavlink_tools</module>
         <module>canbus_replay</module>
         <module>top</module>
-        <module>maps_test_lab</module>
     </modules>
 
     <developers>
@@ -81,6 +80,8 @@
     </scm>
 
     <properties>
+        <revision>4.5.0</revision>
+
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -108,6 +109,7 @@
         <version.mavenCompilerPlugin>3.14.1</version.mavenCompilerPlugin>
         <version.mavenSurefirePlugin>3.5.4</version.mavenSurefirePlugin>
         <version.mavenDeployPlugin>3.1.1</version.mavenDeployPlugin>
+        <version.flattenMavenPlugin>1.8.0</version.flattenMavenPlugin>
         <version.mavenGpgPlugin>3.2.8</version.mavenGpgPlugin>
         <version.mavenJavadocPlugin>3.12.0</version.mavenJavadocPlugin>
         <version.mavenSourcePlugin>3.3.1</version.mavenSourcePlugin>
@@ -381,6 +383,31 @@
         </pluginManagement>
 
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${version.flattenMavenPlugin}</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>

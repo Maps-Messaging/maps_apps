@@ -142,7 +142,7 @@ class DuckDbLogDatabaseTest {
             .print(query.resultSet(), QueryOutputFormat.RAW, new PrintWriter(output));
       }
 
-      assertEquals("{\"taskId\":\"task-1\",\"action\":\"PUSH\"}\n", output.toString());
+      assertEquals("{\"taskId\":\"task-1\",\"action\":\"PUSH\"}" + System.lineSeparator(), output.toString());
     }
   }
 
@@ -159,7 +159,7 @@ class DuckDbLogDatabaseTest {
             .print(query.resultSet(), QueryOutputFormat.RAW, new PrintWriter(output));
       }
 
-      assertEquals("ACTIVE\n", output.toString());
+      assertEquals("ACTIVE" + System.lineSeparator(), output.toString());
     }
   }
 
