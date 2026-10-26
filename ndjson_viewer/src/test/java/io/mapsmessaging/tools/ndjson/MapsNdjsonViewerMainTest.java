@@ -46,7 +46,7 @@ class MapsNdjsonViewerMainTest {
                 "--output",
                 output.toString()
             }));
-    assertEquals("42\n", Files.readString(output));
+    assertEquals("42" + System.lineSeparator(), Files.readString(output));
 
     try (DuckDbLogDatabase database = new DuckDbLogDatabase(databasePath);
          DuckDbLogDatabase.Query query = database.query("SELECT count(*) FROM maps_log")) {
