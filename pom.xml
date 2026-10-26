@@ -40,7 +40,6 @@
         <module>mavlink_tools</module>
         <module>canbus_replay</module>
         <module>top</module>
-        <module>maps_test_lab</module>
     </modules>
 
     <developers>
