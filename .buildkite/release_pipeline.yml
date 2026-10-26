@@ -1,0 +1,55 @@
+steps:
+  - label: ":java: Build maps_apps"
+    key: "build"
+    checkout:
+      ssh_secret: "GITHUB_SSH_KEY"
+    command:
+      - "export SONAR_TOKEN=$(buildkite-agent secret get SONAR_TOKEN)"
+      - "mvn --batch-mode clean verify"
+      - "mvn --batch-mode org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar -Dsonar.token=${SONAR_TOKEN} -Dsonar.projectKey=Maps-Messaging_maps_apps -Dsonar.branch.name=development"
+    artifact_paths:
+      - "*/target/*.jar"
+    agents:
+      queue: "java_build_queue_aws"
+
+  - label: ":debian: Build and publish maps-apps"
+    key: "debian"
+    depends_on: "build"
+    command:
+      - 'echo "--- Downloading Maven artifacts"'
+      - 'buildkite-agent artifact download "*/target/*.jar" . --step build'
+      - 'echo "--- Building Debian package"'
+      - "chmod +x ./packaging/scripts/*.sh"
+      - "./packaging/scripts/build-debian.sh"
+      - 'echo "--- Reading Debian package information"'
+      - "dpkg-deb --info packaging/output/*.deb"
+      - 'echo "--- Listing Debian package contents"'
+      - "dpkg-deb --contents packaging/output/*.deb"
+      - |
+        echo "--- Retrieving Nexus credentials"
+
+        NEXUS_USER="$(buildkite-agent secret get NEXUS_USER)"
+        NEXUS_PASSWORD="$(buildkite-agent secret get NEXUS_PASSWORD)"
+
+        if [ -z "$${NEXUS_USER}" ]; then
+          echo "NEXUS_USER secret is empty" >&2
+          exit 1
+        fi
+
+        if [ -z "$${NEXUS_PASSWORD}" ]; then
+          echo "NEXUS_PASSWORD secret is empty" >&2
+          exit 1
+        fi
+
+        echo "--- Uploading Debian package to maps_apt_release"
+
+        timeout 10m ./packaging/scripts/upload_deb_package.sh \
+          "$${NEXUS_USER}" \
+          "$${NEXUS_PASSWORD}" \
+          maps_apt_release
+
+        echo "--- Nexus upload completed"
+    artifact_paths:
+      - "packaging/output/*.deb"
+    agents:
+      queue: "java_build_queue_aws"
