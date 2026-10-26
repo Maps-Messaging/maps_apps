@@ -18,6 +18,9 @@ services:
       MAPS_LOGGER_FORMAT: csv
       MAPS_LOGGER_OUTPUT_DIR: /var/log/maps-logger
       MAPS_LOGGER_DISK_WARN_MB: 500
+      # Optional broker authentication / TLS; mount secrets read-only, e.g.
+      # MAPS_LOGGER_USERNAME: maps-logger
+      # MAPS_LOGGER_PASSWORD_FILE: /run/secrets/mqtt-password
     volumes:
       - logger-data:/var/log/maps-logger
     depends_on:

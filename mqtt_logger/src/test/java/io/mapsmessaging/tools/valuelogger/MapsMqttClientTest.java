@@ -1,7 +1,9 @@
 package io.mapsmessaging.tools.valuelogger;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -9,6 +11,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -17,17 +21,67 @@ import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 class MapsMqttClientTest {
 
   @Test
-  void connectionOptionsUseExplicitKeepAlive() {
-    MqttConnectOptions options = MapsMqttClient.createConnectionOptions();
+  void connectionOptionsUseExplicitKeepAlive() throws Exception {
+    MqttConnectOptions options = MapsMqttClient.createConnectionOptions(arguments());
 
     assertEquals(MapsMqttClient.KEEP_ALIVE_SECONDS, options.getKeepAliveInterval());
     assertEquals(MapsMqttClient.CONNECTION_TIMEOUT_SECONDS, options.getConnectionTimeout());
     assertFalse(options.isAutomaticReconnect());
+  }
+
+  @Test
+  void connectionOptionsCarryUsernameAndPasswordFromFile(@TempDir Path tempDir) throws Exception {
+    Path passwordFile = Files.writeString(tempDir.resolve("password"), "s3cret\n");
+    MapsValueLoggerArguments arguments = MapsValueLoggerArguments.parse(
+        new String[]{"--url", "tcp://127.0.0.1:1895", "--username", "maps-logger",
+                     "--password-file", passwordFile.toString()},
+        key -> null);
+
+    MqttConnectOptions options = MapsMqttClient.createConnectionOptions(arguments);
+
+    assertEquals("maps-logger", options.getUserName());
+    assertArrayEquals("s3cret".toCharArray(), options.getPassword());
+    assertNull(options.getSocketFactory());
+  }
+
+  @Test
+  void plainConnectionOptionsCarryNoCredentials() throws Exception {
+    MqttConnectOptions options = MapsMqttClient.createConnectionOptions(arguments());
+
+    assertNull(options.getUserName());
+    assertNull(options.getPassword());
+    assertNull(options.getSocketFactory());
+  }
+
+  @Test
+  void startSubscribesToEveryTopic() throws Exception {
+    MapsValueLoggerArguments arguments = MapsValueLoggerArguments.parse(
+        new String[]{"--url", "tcp://127.0.0.1:1883", "--topic", "4817/#,/tak/cot/#", "--qos", "0"},
+        key -> null);
+    MqttAsyncClient client = configuredClient(true);
+    ScheduledExecutorService healthExecutor = mock(ScheduledExecutorService.class);
+    doReturn(mock(ScheduledFuture.class))
+        .when(healthExecutor)
+        .scheduleWithFixedDelay(any(Runnable.class), any(Long.class), any(Long.class), any());
+
+    MapsMqttClient mqttClient =
+        new MapsMqttClient(
+            arguments,
+            (topic, message, acknowledgement) -> {
+            },
+            (url, clientId) -> client,
+            mock(ExecutorService.class),
+            healthExecutor);
+
+    mqttClient.start();
+
+    verify(client).subscribe(new String[]{"4817/#", "/tak/cot/#"}, new int[]{0, 0});
   }
 
   @Test
@@ -58,7 +112,7 @@ class MapsMqttClientTest {
     mqttClient.start();
 
     verify(client).setManualAcks(true);
-    verify(client).subscribe("#", 1);
+    verify(client).subscribe(new String[]{"#"}, new int[]{1});
 
     ArgumentCaptor<MqttConnectOptions> optionsCaptor =
         ArgumentCaptor.forClass(MqttConnectOptions.class);
@@ -106,7 +160,7 @@ class MapsMqttClientTest {
     reconnect.getValue().run();
 
     verify(firstClient).close(true);
-    verify(secondClient).subscribe("#", 1);
+    verify(secondClient).subscribe(new String[]{"#"}, new int[]{1});
     assertEquals(2, created.get());
   }
 
@@ -122,7 +176,7 @@ class MapsMqttClientTest {
     IMqttToken subscribeToken = mock(IMqttToken.class);
 
     when(client.connect(any(MqttConnectOptions.class))).thenReturn(connectToken);
-    when(client.subscribe("#", 1)).thenReturn(subscribeToken);
+    when(client.subscribe(any(String[].class), any(int[].class))).thenReturn(subscribeToken);
     when(client.isConnected()).thenReturn(connected);
 
     return client;

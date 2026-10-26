@@ -47,6 +47,8 @@ public class CsvLogWriter implements LogWriter {
     Path outputPath = Path.of(outputFileName);
     boolean writeHeader = !Files.exists(outputPath) || Files.size(outputPath) == 0;
 
+    LogFiles.createFileIfAbsent(outputPath);
+
     writer = Files.newBufferedWriter(
         outputPath,
         StandardCharsets.UTF_8,
