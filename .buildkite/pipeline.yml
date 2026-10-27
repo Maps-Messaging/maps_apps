@@ -4,6 +4,11 @@ steps:
     checkout:
       ssh_secret: "GITHUB_SSH_KEY"
     command:
+      - export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
+      - export PATH="$$JAVA_HOME/bin:$$PATH"
+      - java -version
+      - javac -version
+      - mvn -version
       - "export SONAR_TOKEN=$(buildkite-agent secret get SONAR_TOKEN)"
       - "mvn --batch-mode clean verify"
       - "mvn --batch-mode org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar -Dsonar.token=${SONAR_TOKEN} -Dsonar.projectKey=Maps-Messaging_maps_apps -Dsonar.branch.name=development"
