@@ -34,6 +34,7 @@
     <modules>
         <module>storage_inspector</module>
         <module>mqtt_logger</module>
+        <module>video_event_recorder</module>
         <module>audit_viewer</module>
         <module>ndjson_viewer</module>
         <module>udp_helpers</module>
