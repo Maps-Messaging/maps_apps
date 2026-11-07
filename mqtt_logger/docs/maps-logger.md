@@ -24,4 +24,4 @@ journalctl -u maps-logger
 
 The logger supports MQTT URL, one or more topic filters, QoS, CSV/NDJSON format, output directory and disk-space warning configuration, plus broker authentication and mutual TLS with credentials read from files.
 
-It runs as the unprivileged `maps-logger` account; output files are readable by the `maps-logger` group only, and compressed archives are listed with their SHA-256 in `/var/log/maps-logger/SHA256SUMS`. See the module README and INSTALL.md for the complete configuration, security and deployment procedure.
+It runs as the unprivileged `maps-logger` account; output files are readable by the `maps-logger` group only. See the module README and INSTALL.md for the complete configuration, security and deployment procedure.

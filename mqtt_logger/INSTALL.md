@@ -40,9 +40,6 @@ rule to the logger's account; see `install/maps-config-snippet.yaml`.
 - Broker credentials and TLS material are only ever read from files, never from command-line
   arguments or the env file. Keep them in `/etc/maps-logger/credentials/` (directory
   `root:maps-logger 0750`, files `root:maps-logger 0640`). They are re-read on every reconnect.
-- Each archive created by the compression timer gets a SHA-256 entry in
-  `/var/log/maps-logger/SHA256SUMS`. Copy it off-host together with the archives and check
-  them with `sha256sum -c SHA256SUMS`.
 - When the broker runs on the same host, confine the logger to loopback with
   `systemctl edit maps-logger`:
 
@@ -233,8 +230,7 @@ Hourly files are created automatically:
 ```
 
 Files are **never deleted** unless `MAPS_LOGGER_RETENTION_DAYS` is set. The compression timer
-runs hourly, gzips files older than two hours and records each archive's SHA-256 in
-`SHA256SUMS`. Disk space warnings appear in the system journal:
+runs hourly and gzips files older than two hours. Disk space warnings appear in the system journal:
 
 ```
 journalctl -u maps-logger | grep WARNING
