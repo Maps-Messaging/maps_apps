@@ -13,7 +13,6 @@ DEVELOPER_ONLY_MODULES=("maps_test_lab")
 LOGGER_INSTALL_SOURCE="${ROOT_DIR}/${LOGGER_MODULE}/install"
 LOGGER_SYSTEMD_SOURCE="${LOGGER_INSTALL_SOURCE}/systemd"
 LOGGER_CONFIG_DIR="/etc/maps-logger"
-LOGGER_LOG_DIR="/var/log/maps-logger"
 SYSTEMD_DIR="/lib/systemd/system"
 MAN_DIR="/usr/share/man"
 
@@ -217,9 +216,10 @@ validate_logger_resources() {
 install_logger_resources() {
   validate_logger_resources
 
+  # The log directory is not shipped: postinst and systemd (LogsDirectory=)
+  # create it owned by the maps-logger service account.
   mkdir -p \
     "${PACKAGE_ROOT}${LOGGER_CONFIG_DIR}" \
-    "${PACKAGE_ROOT}${LOGGER_LOG_DIR}" \
     "${PACKAGE_ROOT}${SYSTEMD_DIR}"
 
   install \
@@ -309,6 +309,22 @@ cat > "${PACKAGE_CONTROL_DIR}/postinst" <<'EOF_POSTINST'
 #!/bin/sh
 set -e
 
+if [ "$1" = "configure" ]; then
+  # The logger runs unprivileged; its logs carry full message payloads.
+  if ! getent passwd maps-logger >/dev/null; then
+    useradd --system --user-group --no-create-home --home-dir /nonexistent \
+      --shell /usr/sbin/nologin maps-logger
+  fi
+
+  install -d -m 0750 -o root -g maps-logger /etc/maps-logger/credentials
+
+  # Earlier versions ran as root: hand existing logs to the service account.
+  mkdir -p /var/log/maps-logger
+  chown -R maps-logger:maps-logger /var/log/maps-logger
+  chmod -R o-rwx /var/log/maps-logger
+  chmod 0750 /var/log/maps-logger
+fi
+
 if [ "$1" = "configure" ] && [ -d /run/systemd/system ]; then
   systemctl daemon-reload >/dev/null 2>&1 || true
 
@@ -354,6 +370,10 @@ chmod 0755 \
   "${PACKAGE_CONTROL_DIR}/postinst" \
   "${PACKAGE_CONTROL_DIR}/prerm" \
   "${PACKAGE_CONTROL_DIR}/postrm"
+
+# Directory modes must not depend on the build host's umask (e.g. 002 would
+# ship group-writable /etc/maps-logger).
+find "${PACKAGE_ROOT}" -type d -exec chmod 0755 {} +
 
 OUTPUT_FILE="${OUTPUT_DIR}/${PACKAGE_NAME}_${DEBIAN_VERSION}_${ARCHITECTURE}.deb"
 rm -f "${OUTPUT_FILE}"
