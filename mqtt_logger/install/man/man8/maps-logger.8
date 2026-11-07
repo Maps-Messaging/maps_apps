@@ -19,7 +19,7 @@ upgrade, the package restarts it to load the new JAR.
 .PP
 A separate timer,
 .BR maps-logger-compress.timer ,
-runs hourly, compresses CSV and NDJSON files older than two hours and appends each archive's
+runs hourly and compresses CSV and NDJSON files older than two hours.
 Files are not deleted unless
 .B MAPS_LOGGER_RETENTION_DAYS
 is set.
