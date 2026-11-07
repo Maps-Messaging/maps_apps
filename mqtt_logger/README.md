@@ -33,8 +33,8 @@ For service installation on Raspberry Pi, Linux GCS laptops, or Docker, see
 
 - Java 21 or later
 - Maven (to build)
-- A running MAPS server exposing MQTT v5 with the `Message-JSON` transformation enabled
-  (see [INSTALL.md — enable JSON transformation](INSTALL.md#important-enable-json-transformation))
+- A running MAPS server exposing MQTT. The logger requests the `Message-JSON` transformation
+  itself (see [INSTALL.md — JSON transformation](INSTALL.md#json-transformation))
 
 ---
 
@@ -109,15 +109,22 @@ java -jar mqtt_logger/target/mqtt_logger-1.0.0-SNAPSHOT.jar \
 
 | Argument | Default | Description |
 |---|---|---|
-| `--url` | *required* | MQTT v5 broker URL, e.g. `tcp://127.0.0.1:1883` |
-| `--topic` | `/#` | Topic filter |
+| `--url` | *required* | MQTT broker URL, e.g. `tcp://127.0.0.1:1883` or `ssl://127.0.0.1:1895` |
+| `--topic` | `#` | Topic filter, or several separated by commas |
 | `--qos` | `1` | MQTT QoS level: `0`, `1`, or `2` |
 | `--format` | inferred / `csv` | Output format: `csv` or `json` |
 | `--output-dir` | `/var/log/maps-logger` | Directory for hourly rotating files (activates rolling mode) |
 | `--output` | — | Single fixed output file path (mutually exclusive with `--output-dir`) |
 | `--disk-warn-mb` | `500` | Warn to stderr when free space drops below this many MB |
+| `--username` | — | Broker user name |
+| `--password-file` | — | File containing the broker password (requires `--username`) |
+| `--keystore` | — | Client certificate keystore for mutual TLS, PKCS12 or JKS (requires `ssl://`) |
+| `--keystore-password-file` | — | File containing the keystore password |
+| `--truststore` | JVM default | Trust store for the broker certificate (requires `ssl://`) |
+| `--truststore-password-file` | — | File containing the trust store password |
 
-`--output` and `--output-dir` are mutually exclusive.
+`--output` and `--output-dir` are mutually exclusive. Secrets are only accepted as files, so
+they never appear in the process list; see [INSTALL.md — Security](INSTALL.md#security).
 
 ### Environment variables
 
@@ -131,6 +138,12 @@ All arguments can be set via environment variables. CLI args take precedence.
 | `MAPS_LOGGER_FORMAT` | `--format` |
 | `MAPS_LOGGER_OUTPUT_DIR` | `--output-dir` |
 | `MAPS_LOGGER_DISK_WARN_MB` | `--disk-warn-mb` |
+| `MAPS_LOGGER_USERNAME` | `--username` |
+| `MAPS_LOGGER_PASSWORD_FILE` | `--password-file` |
+| `MAPS_LOGGER_KEYSTORE` | `--keystore` |
+| `MAPS_LOGGER_KEYSTORE_PASSWORD_FILE` | `--keystore-password-file` |
+| `MAPS_LOGGER_TRUSTSTORE` | `--truststore` |
+| `MAPS_LOGGER_TRUSTSTORE_PASSWORD_FILE` | `--truststore-password-file` |
 
 ---
 
