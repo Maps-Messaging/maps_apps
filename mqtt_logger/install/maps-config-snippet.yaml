@@ -1,15 +1,24 @@
-# Add this transformation block to your MAPS server configuration YAML.
+# The MAPS Value Logger needs messages delivered as Message-JSON envelopes.
 #
-# It ensures that messages received on localhost TCP connections are
-# delivered as JSON — the format the MAPS Value Logger expects.
+# No server configuration is required for that: the logger appends
+# "?Transformation=Message-JSON" to its MQTT client id and MAPS applies the
+# transformation to that connection only.
 #
-# Place this at the top level of your MAPS server config file, or merge
-# into an existing 'transformations' block.
+# Do NOT add a host-wide rule such as
+#
+#   - pattern: "tcp://127.0.0.1/*/*"
+#     transformation: "Message-JSON"
+#
+# It converts traffic for EVERY local MQTT client (web viewers behind a local
+# reverse proxy, bridges, tools) into envelopes and breaks them.
+#
+# If the server should enforce the transformation, scope the rule to the
+# logger's account instead. Patterns are transport://host/protocol/username:
 
 transformations:
   data:
     - pattern: "*://*/*/*"
       transformation: ""
 
-    - pattern: "tcp://127.0.0.1/*/*"
+    - pattern: "*://127.0.0.1/mqtt/maps-logger"
       transformation: "Message-JSON"

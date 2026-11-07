@@ -1,5 +1,6 @@
 package io.mapsmessaging.tools.valuelogger;
 
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -109,13 +110,31 @@ public class MapsMqttClient {
     destroyClient();
   }
 
-  static MqttConnectOptions createConnectionOptions() {
+  static MqttConnectOptions createConnectionOptions(MapsValueLoggerArguments arguments)
+      throws Exception {
     MqttConnectOptions connectionOptions = new MqttConnectOptions();
     connectionOptions.setAutomaticReconnect(false);
     connectionOptions.setCleanSession(true);
     connectionOptions.setMqttVersion(MqttConnectOptions.MQTT_VERSION_3_1_1);
     connectionOptions.setKeepAliveInterval(KEEP_ALIVE_SECONDS);
     connectionOptions.setConnectionTimeout(CONNECTION_TIMEOUT_SECONDS);
+
+    if (arguments.getUsername() != null) {
+      connectionOptions.setUserName(arguments.getUsername());
+    }
+
+    if (arguments.getPasswordFile() != null) {
+      connectionOptions.setPassword(ConnectionSecurity.readSecret(arguments.getPasswordFile()));
+    }
+
+    if (arguments.isTlsUrl()) {
+      connectionOptions.setHttpsHostnameVerificationEnabled(true);
+
+      if (arguments.getKeyStore() != null || arguments.getTrustStore() != null) {
+        connectionOptions.setSocketFactory(ConnectionSecurity.createSocketFactory(arguments));
+      }
+    }
+
     return connectionOptions;
   }
 
@@ -168,15 +187,19 @@ public class MapsMqttClient {
     mqttClient = client;
 
     try {
-      IMqttToken connectToken = client.connect(createConnectionOptions());
+      IMqttToken connectToken = client.connect(createConnectionOptions(arguments));
       connectToken.waitForCompletion(OPERATION_TIMEOUT_MILLIS);
 
-      IMqttToken subscribeToken = client.subscribe(arguments.getTopic(), arguments.getQos());
+      String[] topics = arguments.getTopics().toArray(String[]::new);
+      int[] qosLevels = new int[topics.length];
+      Arrays.fill(qosLevels, arguments.getQos());
+
+      IMqttToken subscribeToken = client.subscribe(topics, qosLevels);
       subscribeToken.waitForCompletion(OPERATION_TIMEOUT_MILLIS);
 
       System.err.println(
           "Subscribed to "
-              + arguments.getTopic()
+              + String.join(",", arguments.getTopics())
               + " using "
               + arguments.getUrl()
               + " (keepalive="
