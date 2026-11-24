@@ -6,10 +6,12 @@ Publish recorded MQTT events from MAPS logger NDJSON logs. Accepts .ndjson and .
 maps-mqtt-replay --dir /data/repmus --broker tcp://127.0.0.1:1883
 maps-mqtt-replay --dir /data/repmus --broker tcp://127.0.0.1:1883 --speed 100
 maps-mqtt-replay --dir /data/repmus --broker tcp://127.0.0.1:1883 --speed 100 --session-per-topic
+maps-mqtt-replay --dir /data/repmus --broker tcp://127.0.0.1:1883 --speed 100 --session-prefix /main_folder/sub_folder
 ```
 
 - `--speed` defaults to 1.0, using logger receive timestamps where present. Speed scales elapsed time; processing and network capacity can limit effective throughput.
 - `--session-per-topic` defaults to off. When enabled, one separate MQTT 3.1.1 clean-session client is opened per distinct topic and retained until replay finishes. This can use substantial broker connection resources.
+- `--session-prefix /main_folder/sub_folder` creates one session for each immediate child folder, such as `/main_folder/sub_folder/drone_1`, shared by all its descendant topics. Topics outside the exact prefix or without a child folder and topic are rejected. This option cannot be combined with `--session-per-topic`.
 - `--qos` sets the fallback MQTT QoS, default 1. Recorded QoS values override it; recorded retain flags are used where present.
 - Invalid entries fail replay with a filename and line number. No records are intentionally dropped.
 - Input must include topic, payload and a timestamp. The transmitted MQTT payload is the JSON `payload` value, not the entire logger envelope. JSON string payloads are sent as plain UTF-8 text.

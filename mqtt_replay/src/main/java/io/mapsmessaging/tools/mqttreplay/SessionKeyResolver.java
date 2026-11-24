@@ -1,0 +1,22 @@
+package io.mapsmessaging.tools.mqttreplay;
+
+final class SessionKeyResolver {
+  private SessionKeyResolver() {
+  }
+
+  static String resolve(String topic, boolean sessionPerTopic, String sessionPrefix) {
+    if (sessionPrefix == null) {
+      return sessionPerTopic ? topic : "";
+    }
+    String prefix = sessionPrefix + "/";
+    if (!topic.startsWith(prefix)) {
+      throw new IllegalArgumentException("Topic outside configured session prefix: " + topic);
+    }
+    int childStart = prefix.length();
+    int childEnd = topic.indexOf('/', childStart);
+    if (childEnd <= childStart || childEnd == topic.length() - 1) {
+      throw new IllegalArgumentException("Topic needs a unique child folder and topic below " + sessionPrefix + ": " + topic);
+    }
+    return topic.substring(0, childEnd);
+  }
+}

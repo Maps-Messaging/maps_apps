@@ -1,0 +1,66 @@
+package io.mapsmessaging.tools.mqttreplay;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Base64;
+
+final class NdjsonReplayDecoder {
+  private NdjsonReplayDecoder() {
+  }
+
+  static ReplayEvent decode(String line, int defaultQos) {
+    JsonObject record = JsonParser.parseString(line).getAsJsonObject();
+    if (present(record, "opaqueData")) {
+      byte[] bytes = Base64.getDecoder().decode(record.get("opaqueData").getAsString());
+      record = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)).getAsJsonObject();
+    }
+
+    if (!present(record, "topic") || record.get("topic").getAsString().isBlank()) {
+      throw new IllegalArgumentException("Missing topic");
+    }
+    Instant timestamp;
+    if (present(record, "receivedTimestamp")) {
+      timestamp = Instant.parse(record.get("receivedTimestamp").getAsString());
+    } else if (present(record, "serverTimestamp")) {
+      timestamp = Instant.parse(record.get("serverTimestamp").getAsString());
+    } else if (present(record, "serverTimeMs")) {
+      timestamp = Instant.ofEpochMilli(record.get("serverTimeMs").getAsLong());
+    } else if (record.has("meta") && record.get("meta").isJsonObject()
+        && present(record.getAsJsonObject("meta"), "time_ms")) {
+      timestamp = Instant.ofEpochMilli(record.getAsJsonObject("meta").get("time_ms").getAsLong());
+    } else if (present(record, "timestamp")) {
+      timestamp = Instant.parse(record.get("timestamp").getAsString());
+    } else {
+      throw new IllegalArgumentException("Missing timestamp");
+    }
+
+    if (!present(record, "payload")) {
+      throw new IllegalArgumentException("Missing payload");
+    }
+    JsonElement payload = record.get("payload");
+    byte[] bytes = (payload.isJsonPrimitive() && payload.getAsJsonPrimitive().isString()
+        ? payload.getAsString() : payload.toString()).getBytes(StandardCharsets.UTF_8);
+
+    int qos = defaultQos;
+    if (present(record, "qos")) {
+      qos = switch (record.get("qos").getAsString()) {
+        case "AT_MOST_ONCE" -> 0;
+        case "AT_LEAST_ONCE" -> 1;
+        case "EXACTLY_ONCE" -> 2;
+        default -> Integer.parseInt(record.get("qos").getAsString());
+      };
+    }
+    if (qos < 0 || qos > 2) {
+      throw new IllegalArgumentException("Invalid QoS");
+    }
+    boolean retained = present(record, "retained") && record.get("retained").getAsBoolean();
+    return new ReplayEvent(timestamp, record.get("topic").getAsString(), bytes, qos, retained);
+  }
+
+  private static boolean present(JsonObject record, String field) {
+    return record.has(field) && !record.get(field).isJsonNull();
+  }
+}

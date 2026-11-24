@@ -14,7 +14,7 @@ class MqttReplayMainTest {
 
   @Test
   void decodesLoggerEventAndDefaults() {
-    MqttReplayMain.Event event = MqttReplayMain.decode(
+    ReplayEvent event = NdjsonReplayDecoder.decode(
         "{\"topic\":\"a/b\",\"receivedTimestamp\":\"2026-09-01T01:00:00Z\",\"payload\":{\"value\":42}}", 1);
     assertEquals("a/b", event.topic());
     assertEquals("{\"value\":42}", new String(event.payload(), StandardCharsets.UTF_8));
@@ -24,12 +24,12 @@ class MqttReplayMainTest {
 
   @Test
   void supportsPerTopicOptionAndRejectsInvalidSpeed() {
-    MqttReplayMain.Options options = MqttReplayMain.Options.parse(
+    ReplayOptions options = ReplayOptions.parse(
         new String[]{"--dir", directory.toString(), "--broker", "tcp://localhost:1883",
             "--speed", "100", "--session-per-topic"});
     assertEquals(100.0, options.speed());
     assertTrue(options.sessionPerTopic());
-    assertThrows(IllegalArgumentException.class, () -> MqttReplayMain.Options.parse(
+    assertThrows(IllegalArgumentException.class, () -> ReplayOptions.parse(
         new String[]{"--dir", directory.toString(), "--broker", "tcp://localhost:1883", "--speed", "0"}));
   }
 
@@ -41,7 +41,7 @@ class MqttReplayMainTest {
     try (GZIPOutputStream output = new GZIPOutputStream(Files.newOutputStream(directory.resolve("a.ndjson.gz")))) {
       output.write(first.getBytes(StandardCharsets.UTF_8));
     }
-    try (MqttReplayMain.EventReader reader = new MqttReplayMain.EventReader(directory, 1)) {
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 1)) {
       assertEquals("a", reader.next().topic());
       assertEquals("b", reader.next().topic());
       assertNull(reader.next());
@@ -51,6 +51,40 @@ class MqttReplayMainTest {
   @Test
   void reportsMalformedRecordInsteadOfSilentlyDroppingIt() throws Exception {
     Files.writeString(directory.resolve("events.ndjson"), "{\"topic\":\"a\",\"payload\":1}\n");
-    assertThrows(java.io.IOException.class, () -> new MqttReplayMain.EventReader(directory, 1));
+    assertThrows(java.io.IOException.class, () -> new NdjsonReplayReader(directory, 1));
+  }
+  @Test
+  void groupsNestedTopicsUnderFirstChildFolder() {
+    String prefix = "/main_folder/sub_folder";
+    assertEquals("/main_folder/sub_folder/drone_1",
+        SessionKeyResolver.resolve(prefix + "/drone_1/position", false, prefix));
+    assertEquals("/main_folder/sub_folder/drone_1",
+        SessionKeyResolver.resolve(prefix + "/drone_1/status/health", false, prefix));
+    assertEquals("/main_folder/sub_folder/drone_2",
+        SessionKeyResolver.resolve(prefix + "/drone_2/position", false, prefix));
+  }
+
+  @Test
+  void rejectsTopicsOutsidePrefixOrWithoutChildTopic() {
+    String prefix = "/main_folder/sub_folder";
+    for (String topic : new String[]{
+        "/other/drone_1/position", "/main_folder/sub_folderX/drone_1/position",
+        prefix + "/drone_1", prefix + "/drone_1/", prefix + "//position"}) {
+      assertThrows(IllegalArgumentException.class, () -> SessionKeyResolver.resolve(topic, false, prefix));
+    }
+  }
+
+  @Test
+  void preservesOriginalGroupingModesAndValidatesNewOption() {
+    assertEquals("", SessionKeyResolver.resolve("a/b", false, null));
+    assertEquals("a/b", SessionKeyResolver.resolve("a/b", true, null));
+    ReplayOptions options = ReplayOptions.parse(new String[]{
+        "--dir", directory.toString(), "--broker", "tcp://localhost:1883",
+        "--session-prefix", "/main_folder/sub_folder/"});
+    assertEquals("/main_folder/sub_folder", options.sessionPrefix());
+    assertThrows(IllegalArgumentException.class, () -> ReplayOptions.parse(new String[]{
+        "--dir", directory.toString(), "--broker", "tcp://localhost:1883",
+        "--session-prefix", "/main_folder/sub_folder", "--session-per-topic"}));
   }
 }
+
