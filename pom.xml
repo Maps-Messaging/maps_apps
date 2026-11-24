@@ -34,7 +34,7 @@
     <modules>
         <module>storage_inspector</module>
         <module>mqtt_logger</module>
-        <module>mqtt_replay</module>
+        <module>mqtt_mesh_test</module>
         <module>audit_viewer</module>
         <module>ndjson_viewer</module>
         <module>udp_helpers</module>

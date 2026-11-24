@@ -2,8 +2,16 @@ package io.mapsmessaging.tools.mqttreplay;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
-public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic, String sessionPrefix, int qos) {
+public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
+                            String sessionPrefix, int qos, List<String> observeUrls,
+                            String observeTopic, long drainMillis, Path report) {
+  public ReplayOptions {
+    observeUrls = List.copyOf(observeUrls);
+  }
+
   public static ReplayOptions parse(String[] arguments) {
     Path directory = null;
     String broker = null;
@@ -11,6 +19,10 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     boolean sessionPerTopic = false;
     String sessionPrefix = null;
     int qos = 1;
+    List<String> observeUrls = new ArrayList<>();
+    String observeTopic = "#";
+    long drainMillis = 5000;
+    Path report = null;
 
     for (int i = 0; i < arguments.length; i++) {
       String option = arguments[i];
@@ -21,6 +33,10 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
         case "--session-per-topic" -> sessionPerTopic = true;
         case "--session-prefix" -> sessionPrefix = value(arguments, ++i, option);
         case "--qos" -> qos = Integer.parseInt(value(arguments, ++i, option));
+        case "--observe" -> observeUrls.add(value(arguments, ++i, option));
+        case "--observe-topic" -> observeTopic = value(arguments, ++i, option);
+        case "--drain-ms" -> drainMillis = Long.parseLong(value(arguments, ++i, option));
+        case "--report" -> report = Path.of(value(arguments, ++i, option));
         default -> throw new IllegalArgumentException("Unknown argument: " + option);
       }
     }
@@ -47,7 +63,14 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     if (qos < 0 || qos > 2) {
       throw new IllegalArgumentException("--qos must be 0, 1 or 2");
     }
-    return new ReplayOptions(directory, broker, speed, sessionPerTopic, sessionPrefix, qos);
+    if (drainMillis < 0) {
+      throw new IllegalArgumentException("--drain-ms must be non-negative");
+    }
+    if (observeTopic.isBlank()) {
+      throw new IllegalArgumentException("--observe-topic must not be blank");
+    }
+    return new ReplayOptions(directory, broker, speed, sessionPerTopic, sessionPrefix, qos,
+        observeUrls, observeTopic, drainMillis, report);
   }
 
   private static String value(String[] arguments, int index, String option) {

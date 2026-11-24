@@ -9,8 +9,8 @@
     <version>${revision}</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
-  <artifactId>mqtt_replay</artifactId>
-  <name>MQTT Replay</name>
+  <artifactId>mqtt_mesh_test</artifactId>
+  <name>MQTT Mesh Test</name>
   <dependencies>
     <dependency>
       <groupId>org.eclipse.paho</groupId><artifactId>org.eclipse.paho.client.mqttv3</artifactId><version>1.2.5</version>
