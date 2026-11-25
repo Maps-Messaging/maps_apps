@@ -69,6 +69,10 @@ public final class NdjsonReplayReader implements AutoCloseable {
     return event;
   }
 
+  long skippedRecords() {
+    return sources.stream().mapToLong(source -> source.skippedRecords).sum();
+  }
+
   @Override
   public void close() throws IOException {
     IOException error = null;
@@ -94,6 +98,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
     private final int qos;
     private final BufferedReader reader;
     private long lineNumber;
+    private long skippedRecords;
     private ReplayEvent current;
 
     Source(Path path, int index, int qos) throws IOException {
@@ -115,7 +120,17 @@ public final class NdjsonReplayReader implements AutoCloseable {
         try {
           current = NdjsonReplayDecoder.decode(line, qos);
         } catch (RuntimeException exception) {
-          throw new IOException("Invalid event " + path + ":" + lineNumber, exception);
+          skippedRecords++;
+          String reason = exception.getMessage();
+          if (reason == null || reason.isBlank()) {
+            reason = exception.getClass().getSimpleName();
+          }
+          reason = reason.replace('\n', ' ').replace('\r', ' ');
+          if (reason.length() > 200) {
+            reason = reason.substring(0, 200) + "...";
+          }
+          System.err.println("Skipping invalid event " + path + ":" + lineNumber + ": " + reason);
+          continue;
         }
         return true;
       }

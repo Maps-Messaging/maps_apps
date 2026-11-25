@@ -42,7 +42,7 @@ public final class MqttReplayMain {
           System.out.printf("Published %,d events using %d sessions%n", count, publisher.sessionCount());
         }
       }
-      System.out.printf("Completed: %,d events, %d sessions%n", count, publisher.sessionCount());
+      System.out.printf("Completed: %,d events, %,d invalid records skipped, %d sessions%n", count, reader.skippedRecords(), publisher.sessionCount());
       if (!options.observeUrls().isEmpty() && !validation.finish().successful()) {
         throw new IllegalStateException("One or more MQTT observation points failed validation");
       }

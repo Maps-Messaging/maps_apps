@@ -49,10 +49,35 @@ class MqttReplayMainTest {
   }
 
   @Test
-  void reportsMalformedRecordInsteadOfSilentlyDroppingIt() throws Exception {
-    Files.writeString(directory.resolve("events.ndjson"), "{\"topic\":\"a\",\"payload\":1}\n");
-    assertThrows(java.io.IOException.class, () -> new NdjsonReplayReader(directory, 1));
+  void skipsMalformedRecordsAndContinuesWithLaterEvents() throws Exception {
+    String malformed = "{\"topic\":\"bad\",\"payload\":1}\n";
+    String first = "{\"topic\":\"valid\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":2}\n";
+    String second = "{\"topic\":\"last\",\"receivedTimestamp\":\"2026-09-01T00:00:01Z\",\"payload\":3}\n";
+    Files.writeString(directory.resolve("events.ndjson"), malformed + first + "\"\\u0000\"\n" + second);
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 1)) {
+      assertEquals("valid", reader.next().topic());
+      assertEquals("last", reader.next().topic());
+      assertNull(reader.next());
+      assertEquals(2L, reader.skippedRecords());
+    }
   }
+
+  @Test
+  void skipsInvalidRecordInsideGzipAndContinues() throws Exception {
+    String content = "{\"topic\":\"a\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":1}\n"
+        + "{\"topic\":\"invalid\"}\n"
+        + "{\"topic\":\"b\",\"receivedTimestamp\":\"2026-09-01T00:00:01Z\",\"payload\":2}\n";
+    try (GZIPOutputStream output = new GZIPOutputStream(Files.newOutputStream(directory.resolve("events.ndjson.gz")))) {
+      output.write(content.getBytes(StandardCharsets.UTF_8));
+    }
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 1)) {
+      assertEquals("a", reader.next().topic());
+      assertEquals("b", reader.next().topic());
+      assertNull(reader.next());
+      assertEquals(1L, reader.skippedRecords());
+    }
+  }
+
   @Test
   void groupsNestedTopicsUnderFirstChildFolder() {
     String prefix = "/main_folder/sub_folder";
