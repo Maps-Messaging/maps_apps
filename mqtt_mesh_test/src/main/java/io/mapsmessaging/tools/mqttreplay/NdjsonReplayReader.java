@@ -34,6 +34,8 @@ public final class NdjsonReplayReader implements AutoCloseable {
       }
       for (Path file : files) {
         Source source = new Source(file, sources.size(), qos);
+        System.out.printf("Opening replay log %d/%d: %s (%,d records)%n",
+            source.index + 1, files.size(), file, source.totalRecords);
         sources.add(source);
         if (source.advance()) {
           queue.add(source);
@@ -69,6 +71,14 @@ public final class NdjsonReplayReader implements AutoCloseable {
     return event;
   }
 
+  long totalRecords() {
+    return sources.stream().mapToLong(source -> source.totalRecords).sum();
+  }
+
+  long recordsRead() {
+    return sources.stream().mapToLong(source -> source.recordsRead).sum();
+  }
+
   long skippedRecords() {
     return sources.stream().mapToLong(source -> source.skippedRecords).sum();
   }
@@ -97,7 +107,9 @@ public final class NdjsonReplayReader implements AutoCloseable {
     private final int index;
     private final int qos;
     private final BufferedReader reader;
+    private final long totalRecords;
     private long lineNumber;
+    private long recordsRead;
     private long skippedRecords;
     private ReplayEvent current;
 
@@ -105,7 +117,21 @@ public final class NdjsonReplayReader implements AutoCloseable {
       this.path = path;
       this.index = index;
       this.qos = qos;
-      this.reader = path.toString().toLowerCase(Locale.ROOT).endsWith(".gz")
+      try (BufferedReader counter = open(path)) {
+        long count = 0;
+        String line;
+        while ((line = counter.readLine()) != null) {
+          if (!line.isBlank()) {
+            count++;
+          }
+        }
+        totalRecords = count;
+      }
+      this.reader = open(path);
+    }
+
+    private static BufferedReader open(Path path) throws IOException {
+      return path.toString().toLowerCase(Locale.ROOT).endsWith(".gz")
           ? new BufferedReader(new InputStreamReader(new GZIPInputStream(Files.newInputStream(path)), StandardCharsets.UTF_8))
           : Files.newBufferedReader(path, StandardCharsets.UTF_8);
     }
@@ -117,6 +143,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
         if (line.isBlank()) {
           continue;
         }
+        recordsRead++;
         try {
           current = NdjsonReplayDecoder.decode(line, qos);
         } catch (RuntimeException exception) {

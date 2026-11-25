@@ -49,6 +49,25 @@ class MqttReplayMainTest {
   }
 
   @Test
+  void countsRecordsAcrossPlainAndGzipFilesForOverallProgress() throws Exception {
+    String a = "{\"topic\":\"a\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":1}\n";
+    String b = "{\"topic\":\"b\",\"receivedTimestamp\":\"2026-09-01T00:00:01Z\",\"payload\":2}\n";
+    Files.writeString(directory.resolve("a.ndjson"), "\n" + a);
+    try (GZIPOutputStream output = new GZIPOutputStream(Files.newOutputStream(directory.resolve("b.ndjson.gz")))) {
+      output.write((b + "{\"topic\":\"missing-timestamp\",\"payload\":3}\n").getBytes(StandardCharsets.UTF_8));
+    }
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 1)) {
+      assertEquals(3L, reader.totalRecords());
+      assertEquals(3L, reader.recordsRead());
+      assertEquals(1L, reader.skippedRecords());
+      assertEquals("a", reader.next().topic());
+      assertEquals("b", reader.next().topic());
+      assertNull(reader.next());
+      assertEquals(3L, reader.recordsRead());
+    }
+  }
+
+  @Test
   void skipsMalformedRecordsAndContinuesWithLaterEvents() throws Exception {
     String malformed = "{\"topic\":\"bad\",\"payload\":1}\n";
     String first = "{\"topic\":\"valid\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":2}\n";
