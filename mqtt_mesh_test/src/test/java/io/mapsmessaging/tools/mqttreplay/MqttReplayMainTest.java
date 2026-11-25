@@ -65,12 +65,13 @@ class MqttReplayMainTest {
   }
 
   @Test
-  void rejectsTopicsOutsidePrefixOrWithoutChildTopic() {
+  void usesSharedFallbackSessionForUnmatchedTopics() {
     String prefix = "/main_folder/sub_folder";
     for (String topic : new String[]{
         "/other/drone_1/position", "/main_folder/sub_folderX/drone_1/position",
-        prefix + "/drone_1", prefix + "/drone_1/", prefix + "//position"}) {
-      assertThrows(IllegalArgumentException.class, () -> SessionKeyResolver.resolve(topic, false, prefix));
+        prefix + "/drone_1", prefix + "/drone_1/", prefix + "//position",
+        "/state/twins/RHIB-001"}) {
+      assertEquals("", SessionKeyResolver.resolve(topic, false, prefix));
     }
   }
 
