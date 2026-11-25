@@ -1,0 +1,31 @@
+.TH MAPS-MQTT-REPLAY 1 "25 November 2026" "maps-apps 4.6.0" "User Commands"
+.SH NAME
+maps-mqtt-replay \- compatibility command for MQTT event replay and mesh validation
+.SH SYNOPSIS
+.B maps-mqtt-replay
+.BI --dir " directory"
+.BI --broker " url"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-mqtt-replay
+is a backwards-compatible command name for
+.BR maps-mqtt-mesh-test (1).
+Both commands execute the same application and accept the same options,
+including replay acceleration, session grouping, and optional MQTT observation
+points. Without
+.BR --observe ,
+only replay is performed.
+.SH EXAMPLES
+.EX
+maps-mqtt-replay --dir /data/repmus \
+  --broker tcp://127.0.0.1:1883 --speed 100
+.EE
+.SH FILES
+.TP
+.I /opt/maps/apps/mqtt_mesh_test.jar
+Executable JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-mqtt-mesh-test (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.

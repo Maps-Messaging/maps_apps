@@ -1,0 +1,126 @@
+.TH MAPS-MQTT-MESH-TEST 1 "25 November 2026" "maps-apps 4.6.0" "User Commands"
+.SH NAME
+maps-mqtt-mesh-test \- replay MQTT logs and optionally verify delivery at multiple brokers
+.SH SYNOPSIS
+.B maps-mqtt-mesh-test
+.BI --dir " directory"
+.BI --broker " url"
+.RI [ options ]
+.SH DESCRIPTION
+.B maps-mqtt-mesh-test
+replays recorded MQTT events from MAPS logger NDJSON files to a publishing broker.
+The files may be plain
+.B .ndjson
+or gzip-compressed
+.BR .ndjson.gz .
+Files are discovered recursively and merged by recorded timestamp; each individual
+file must already be in timestamp order. The application sends the reconstructed
+message payload on its original topic.
+.PP
+Without any
+.B --observe
+arguments, the command only replays events. Each
+.B --observe
+argument adds an independent MQTT subscriber for delivery validation. All
+subscriptions are established before replay begins. Subscribers may connect to
+the publishing broker or to other brokers in a chain or mesh.
+.PP
+The tool uses MQTT 3.1.1 and does not attempt to discover topology or infer
+a message's path through the brokers.
+.SH OPTIONS
+.TP
+.BI --dir " directory"
+Directory containing recorded .ndjson and .ndjson.gz files. Required.
+.TP
+.BI --broker " url"
+MQTT publishing broker URL, for example tcp://127.0.0.1:1883. Required.
+.TP
+.BI --speed " factor"
+Replay speed multiplier. Default: 1.0. Must be finite and greater than zero.
+For example, 100 compresses recorded timestamp intervals by a factor of 100.
+Actual throughput is limited by publishing and broker performance.
+.TP
+.B --session-per-topic
+Use one MQTT publishing client session for each distinct full topic.
+Mutually exclusive with
+.BR --session-prefix .
+.TP
+.BI --session-prefix " path"
+Use one publishing client session for each immediate child beneath the given
+absolute MQTT topic path. For example, with /main/sub, the topics
+/main/sub/unit1/position and /main/sub/unit1/status share a session,
+while /main/sub/unit2/position uses another. Topics outside the prefix,
+or without both a child folder and a topic below it, are rejected.
+Mutually exclusive with
+.BR --session-per-topic .
+.TP
+.BI --qos " 0|1|2"
+Fallback publishing QoS when the recording has none. Default: 1.
+Recorded QoS and retain values are used when available.
+.TP
+.BI --observe " url"
+Subscribe to this MQTT broker and independently validate received events.
+Repeat for any number of observation points. With no observation URLs,
+validation is disabled and the command runs in replay-only mode.
+.TP
+.BI --observe-topic " filter"
+MQTT subscription topic filter used on every observation point. Default: #.
+Choose a filter covering all published topics to avoid false missing results.
+.TP
+.BI --drain-ms " milliseconds"
+Continue collecting observations after the final publication for this number
+of milliseconds. Default: 5000. Must be non-negative.
+.TP
+.BI --report " file"
+Write a pretty-printed JSON validation report to the specified file in
+addition to reporting on standard output. Used when observers are configured.
+.SH VALIDATION
+Each observation point is compared independently with the published events,
+using the exact MQTT topic, a SHA-256 hash of the reconstructed payload bytes,
+and occurrence counts. Arrival order is not assumed across topics.
+.PP
+The report includes published, received, matched, missing, excess, and unexpected
+event counts, observer connection errors, and up to 100 mismatch examples per
+observer. A validation failure results in a nonzero exit status.
+.SH EXAMPLES
+Replay the REPMUS archive at 100 times the recorded rate:
+.PP
+.EX
+maps-mqtt-mesh-test --dir /data/repmus \
+  --broker tcp://s1:1883 --speed 100
+.EE
+.PP
+Replay to S1 and validate deliveries observed at S1, S2, and S3:
+.PP
+.EX
+maps-mqtt-mesh-test --dir /data/repmus \
+  --broker tcp://s1:1883 --speed 100 \
+  --session-prefix /main_folder/sub_folder \
+  --observe tcp://s1:1883 \
+  --observe tcp://s2:1883 \
+  --observe tcp://s3:1883 \
+  --observe-topic '#' --drain-ms 15000 \
+  --report results.json
+.EE
+.SH LIMITATIONS
+Repeated identical messages on the same topic cannot be individually identified;
+occurrence counts can conceal a loss offset by an identical duplicate.
+Retained messages and unrelated traffic may appear as unexpected observations.
+Large datasets with many distinct topic/payload combinations may require
+substantial memory for validation. Messages arriving after the drain period
+are counted as missing.
+.PP
+The logger JSON format cannot necessarily reconstruct original binary MQTT
+payloads, JSON whitespace, MQTT 5 properties, or upstream client identifiers.
+The tool does not check MAVLink command equivalence.
+.SH FILES
+.TP
+.I /opt/maps/apps/mqtt_mesh_test.jar
+Executable JAR installed by the maps-apps Debian package.
+.SH SEE ALSO
+.BR maps-mqtt-replay (1),
+.BR maps-apps (7)
+.SH AUTHOR
+MapsMessaging B.V.
+.SH REPORTING BUGS
+Report issues at the Maps-Messaging/maps_apps GitHub repository.
