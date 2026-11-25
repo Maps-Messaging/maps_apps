@@ -45,8 +45,9 @@ public final class MqttReplayMain {
           long totalRecords = reader.totalRecords();
           long recordsRead = reader.recordsRead();
           double progress = totalRecords == 0 ? 100.0 : 100.0 * recordsRead / totalRecords;
-          System.out.printf("Published %,d events using %d sessions (%,.0f events/sec) (%.1f%% read: %,d/%,d records)%n",
-              count, publisher.sessionCount(), eventsPerSecond, progress, recordsRead, totalRecords);
+          System.out.printf("Published %,d events using %d sessions (%,.0f events/sec) (%.1f%% read: %,d/%,d records)%s%n",
+              count, publisher.sessionCount(), eventsPerSecond, progress, recordsRead, totalRecords,
+              options.observeUrls().isEmpty() ? "" : validation.progress());
           lastReportNanos = now;
         }
       }

@@ -84,6 +84,18 @@ final class ReplayValidationEngine {
     return new ValidationReport(sent.sum(), results);
   }
 
+  List<ObserverProgress> progress() {
+    List<ObserverProgress> result = new ArrayList<>(observers.size());
+    for (Map.Entry<String, ObserverState> entry : observers.entrySet()) {
+      ObserverState observer = entry.getValue();
+      result.add(new ObserverProgress(entry.getKey(), observer.received.sum(), observer.matched.sum()));
+    }
+    return result;
+  }
+
+  record ObserverProgress(String name, long received, long matched) {
+  }
+
   int pendingKeyCount(String observerName) {
     ObserverState observer = observers.get(observerName);
     if (observer == null) {

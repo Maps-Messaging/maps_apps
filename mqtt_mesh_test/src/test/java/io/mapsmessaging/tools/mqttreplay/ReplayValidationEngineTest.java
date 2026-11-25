@@ -92,6 +92,22 @@ class ReplayValidationEngineTest {
   }
 
   @Test
+  void reportsSubscriberProgressIndependentlyForEachObserver() {
+    ReplayValidationEngine engine = new ReplayValidationEngine(List.of("s1", "s3"));
+    engine.published("/a", data("1"));
+    engine.received("s1", "/a", data("1"));
+    engine.received("s1", "/unexpected", data("x"));
+
+    List<ReplayValidationEngine.ObserverProgress> progress = engine.progress();
+    assertEquals("s1", progress.get(0).name());
+    assertEquals(2L, progress.get(0).received());
+    assertEquals(1L, progress.get(0).matched());
+    assertEquals("s3", progress.get(1).name());
+    assertEquals(0L, progress.get(1).received());
+    assertEquals(0L, progress.get(1).matched());
+  }
+
+  @Test
   void recordsObserverErrors() {
     ReplayValidationEngine engine = new ReplayValidationEngine(List.of("s1"));
     ValidationReport.ObserverResult result = engine.snapshot(Map.of("s1", "Connection lost")).observers().get(0);

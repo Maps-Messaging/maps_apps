@@ -30,7 +30,20 @@ final class ValidationCoordinator implements AutoCloseable {
       MqttObservationClient client = new MqttObservationClient(names.get(index), options.observeUrls().get(index), engine);
       clients.add(client);
       client.start(options.observeTopic());
+      System.out.printf("Subscriber %s connected to %s, subscribed to %s%n",
+          names.get(index), options.observeUrls().get(index), options.observeTopic());
     }
+  }
+
+  String progress() {
+    StringBuilder status = new StringBuilder();
+    for (ReplayValidationEngine.ObserverProgress progress : engine.progress()) {
+      status.append(" [").append(progress.name())
+          .append(": received ").append(String.format("%,d", progress.received()))
+          .append(", matched ").append(String.format("%,d", progress.matched()))
+          .append("]");
+    }
+    return status.toString();
   }
 
   void published(ReplayEvent event) {
