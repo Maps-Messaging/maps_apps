@@ -7,79 +7,94 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 
-/** Records observations without assuming that different MQTT topics arrive in publication order. */
+/** Reconciles observations as they arrive without retaining fully matched message keys. */
 final class ReplayValidationEngine {
   private static final int MAX_MISMATCH_SAMPLES = 100;
-  private final ConcurrentHashMap<MessageKey, LongAdder> expected = new ConcurrentHashMap<>();
-  private final Map<String, ConcurrentHashMap<MessageKey, LongAdder>> observed = new LinkedHashMap<>();
-  private final Map<String, LongAdder> totals = new LinkedHashMap<>();
+  private final Map<String, ObserverState> observers = new LinkedHashMap<>();
   private final LongAdder sent = new LongAdder();
 
   ReplayValidationEngine(List<String> observerNames) {
     for (String name : observerNames) {
-      if (observed.putIfAbsent(name, new ConcurrentHashMap<>()) != null) {
+      if (observers.putIfAbsent(name, new ObserverState()) != null) {
         throw new IllegalArgumentException("Duplicate observer name: " + name);
       }
-      totals.put(name, new LongAdder());
     }
   }
 
   void published(String topic, byte[] payload) {
-    expected.computeIfAbsent(MessageKey.of(topic, payload), ignored -> new LongAdder()).increment();
+    MessageKey key = MessageKey.of(topic, payload);
+    for (ObserverState observer : observers.values()) {
+      observer.pending.compute(key, (ignored, count) -> {
+        long previous = count == null ? 0 : count;
+        if (previous < 0) {
+          observer.matched.increment();
+        }
+        long remaining = previous + 1;
+        return remaining == 0 ? null : remaining;
+      });
+    }
     sent.increment();
   }
 
   void received(String observerName, String topic, byte[] payload) {
-    ConcurrentHashMap<MessageKey, LongAdder> counts = observed.get(observerName);
-    if (counts == null) {
+    ObserverState observer = observers.get(observerName);
+    if (observer == null) {
       throw new IllegalArgumentException("Unknown observer: " + observerName);
     }
-    counts.computeIfAbsent(MessageKey.of(topic, payload), ignored -> new LongAdder()).increment();
-    totals.get(observerName).increment();
+    MessageKey key = MessageKey.of(topic, payload);
+    observer.pending.compute(key, (ignored, count) -> {
+      long previous = count == null ? 0 : count;
+      if (previous > 0) {
+        observer.matched.increment();
+      }
+      long remaining = previous - 1;
+      return remaining == 0 ? null : remaining;
+    });
+    observer.received.increment();
   }
 
   ValidationReport snapshot(Map<String, String> observerErrors) {
-    Map<MessageKey, Long> expectedCounts = copy(expected);
     List<ValidationReport.ObserverResult> results = new ArrayList<>();
-    for (Map.Entry<String, ConcurrentHashMap<MessageKey, LongAdder>> entry : observed.entrySet()) {
+    for (Map.Entry<String, ObserverState> entry : observers.entrySet()) {
       String name = entry.getKey();
-      Map<MessageKey, Long> receivedCounts = copy(entry.getValue());
-      long matched = 0;
+      ObserverState observer = entry.getValue();
       long missing = 0;
-      long excess = 0;
       long unexpected = 0;
       long mismatchKeys = 0;
       List<ValidationReport.Mismatch> samples = new ArrayList<>();
-      for (Map.Entry<MessageKey, Long> item : expectedCounts.entrySet()) {
-        long actual = receivedCounts.getOrDefault(item.getKey(), 0L);
-        matched += Math.min(item.getValue(), actual);
-        missing += Math.max(0L, item.getValue() - actual);
-        excess += Math.max(0L, actual - item.getValue());
-        if (actual != item.getValue()) {
-          mismatchKeys++;
-          if (samples.size() < MAX_MISMATCH_SAMPLES) {
-            samples.add(new ValidationReport.Mismatch(item.getKey().topic(), item.getKey().payloadHash(), item.getValue(), actual));
-          }
+      for (Map.Entry<MessageKey, Long> item : observer.pending.entrySet()) {
+        long difference = item.getValue();
+        if (difference == 0) {
+          continue;
+        }
+        mismatchKeys++;
+        if (difference > 0) {
+          missing += difference;
+        } else {
+          unexpected -= difference;
+        }
+        if (samples.size() < MAX_MISMATCH_SAMPLES) {
+          samples.add(new ValidationReport.Mismatch(item.getKey().topic(), item.getKey().payloadHash(),
+              Math.max(0L, difference), Math.max(0L, -difference)));
         }
       }
-      for (Map.Entry<MessageKey, Long> item : receivedCounts.entrySet()) {
-        if (!expectedCounts.containsKey(item.getKey())) {
-          unexpected += item.getValue();
-          mismatchKeys++;
-          if (samples.size() < MAX_MISMATCH_SAMPLES) {
-            samples.add(new ValidationReport.Mismatch(item.getKey().topic(), item.getKey().payloadHash(), 0, item.getValue()));
-          }
-        }
-      }
-      results.add(new ValidationReport.ObserverResult(name, totals.get(name).sum(), matched, missing,
-          excess, unexpected, observerErrors.get(name), mismatchKeys, samples));
+      results.add(new ValidationReport.ObserverResult(name, observer.received.sum(), observer.matched.sum(),
+          missing, 0, unexpected, observerErrors.get(name), mismatchKeys, samples));
     }
     return new ValidationReport(sent.sum(), results);
   }
 
-  private static Map<MessageKey, Long> copy(ConcurrentHashMap<MessageKey, LongAdder> source) {
-    Map<MessageKey, Long> result = new LinkedHashMap<>();
-    source.forEach((key, counter) -> result.put(key, counter.sum()));
-    return result;
+  int pendingKeyCount(String observerName) {
+    ObserverState observer = observers.get(observerName);
+    if (observer == null) {
+      throw new IllegalArgumentException("Unknown observer: " + observerName);
+    }
+    return observer.pending.size();
+  }
+
+  private static final class ObserverState {
+    private final ConcurrentHashMap<MessageKey, Long> pending = new ConcurrentHashMap<>();
+    private final LongAdder received = new LongAdder();
+    private final LongAdder matched = new LongAdder();
   }
 }

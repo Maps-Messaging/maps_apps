@@ -91,9 +91,14 @@ Each observation point is compared independently with the published events,
 using the exact MQTT topic, a SHA-256 hash of the reconstructed payload bytes,
 and occurrence counts. Arrival order is not assumed across topics.
 .PP
-The report includes published, received, matched, missing, excess, and unexpected
-event counts, observer connection errors, and up to 100 mismatch examples per
-observer. A validation failure results in a nonzero exit status.
+Matched message keys are removed as soon as both publication and observation
+are recorded. Only unmatched topic and payload-hash occurrences remain in memory.
+The report includes published, received, matched, missing and unexpected
+event counts, observer connection errors, and up to 100 outstanding mismatch
+examples per observer. Unexpected includes all unmatched received events,
+including excess duplicates. The legacy excess field remains zero because
+distinguishing excess duplicates from unknown messages would require retained
+historical keys. A validation failure results in a nonzero exit status.
 .SH EXAMPLES
 Replay the REPMUS archive at 100 times the recorded rate:
 .PP
@@ -118,8 +123,8 @@ maps-mqtt-mesh-test --dir /data/repmus \
 Repeated identical messages on the same topic cannot be individually identified;
 occurrence counts can conceal a loss offset by an identical duplicate.
 Retained messages and unrelated traffic may appear as unexpected observations.
-Large datasets with many distinct topic/payload combinations may require
-substantial memory for validation. Messages arriving after the drain period
+Large backlogs of unmatched topic/payload combinations may require substantial
+memory for validation. Messages arriving after the drain period
 are counted as missing.
 .PP
 The logger JSON format cannot necessarily reconstruct original binary MQTT
