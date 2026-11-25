@@ -28,12 +28,12 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
       String option = arguments[i];
       switch (option) {
         case "--dir" -> directory = Path.of(value(arguments, ++i, option));
-        case "--broker" -> broker = value(arguments, ++i, option);
+        case "--broker" -> broker = BrokerUrl.normalize(value(arguments, ++i, option));
         case "--speed" -> speed = Double.parseDouble(value(arguments, ++i, option));
         case "--session-per-topic" -> sessionPerTopic = true;
         case "--session-prefix" -> sessionPrefix = value(arguments, ++i, option);
         case "--qos" -> qos = Integer.parseInt(value(arguments, ++i, option));
-        case "--observe" -> observeUrls.add(value(arguments, ++i, option));
+        case "--observe" -> observeUrls.add(BrokerUrl.normalize(value(arguments, ++i, option)));
         case "--observe-topic" -> observeTopic = value(arguments, ++i, option);
         case "--drain-ms" -> drainMillis = Long.parseLong(value(arguments, ++i, option));
         case "--report" -> report = Path.of(value(arguments, ++i, option));
@@ -53,8 +53,8 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
       throw new IllegalArgumentException("--session-per-topic and --session-prefix are mutually exclusive");
     }
     if (sessionPrefix != null) {
-      if (!sessionPrefix.startsWith("/") || sessionPrefix.equals("/") || sessionPrefix.contains("//") || sessionPrefix.contains("+") || sessionPrefix.contains("#")) {
-        throw new IllegalArgumentException("--session-prefix must be an absolute MQTT topic path");
+      if (sessionPrefix.isBlank() || sessionPrefix.equals("/") || sessionPrefix.contains("//") || sessionPrefix.contains("+") || sessionPrefix.contains("#")) {
+        throw new IllegalArgumentException("--session-prefix must be a valid MQTT topic prefix");
       }
       while (sessionPrefix.endsWith("/")) {
         sessionPrefix = sessionPrefix.substring(0, sessionPrefix.length() - 1);
