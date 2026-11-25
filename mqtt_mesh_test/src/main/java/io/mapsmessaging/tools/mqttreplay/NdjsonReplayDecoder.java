@@ -16,6 +16,10 @@ final class NdjsonReplayDecoder {
     if (!present(record, "topic") || record.get("topic").getAsString().isBlank()) {
       throw new IllegalArgumentException("Missing topic");
     }
+    String topic = record.get("topic").getAsString();
+    if (topic.indexOf('+') >= 0 || topic.indexOf('#') >= 0) {
+      throw new IllegalArgumentException("Invalid MQTT PUBLISH topic (wildcards are not allowed): " + topic);
+    }
     Instant timestamp;
     if (present(record, "receivedTimestamp")) {
       timestamp = Instant.parse(record.get("receivedTimestamp").getAsString());
@@ -59,7 +63,7 @@ final class NdjsonReplayDecoder {
     }
     boolean retained = present(record, "retain") ? record.get("retain").getAsBoolean()
         : present(record, "retained") && record.get("retained").getAsBoolean();
-    return new ReplayEvent(timestamp, record.get("topic").getAsString(), bytes, qos, retained);
+    return new ReplayEvent(timestamp, topic, bytes, qos, retained);
   }
 
   private static boolean present(JsonObject record, String field) {

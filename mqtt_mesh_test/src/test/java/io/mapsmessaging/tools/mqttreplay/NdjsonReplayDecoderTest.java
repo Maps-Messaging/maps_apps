@@ -44,6 +44,16 @@ class NdjsonReplayDecoderTest {
   }
 
   @Test
+  void rejectsWildcardPublishTopicsAndReportsTopicName() {
+    for (String topic : new String[]{"sensors/+/data", "sensors/#"}) {
+      IllegalArgumentException exception = org.junit.jupiter.api.Assertions.assertThrows(
+          IllegalArgumentException.class, () -> NdjsonReplayDecoder.decode(
+              "{\"topic\":\"" + topic + "\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":1}", 0));
+      assertTrue(exception.getMessage().contains(topic));
+    }
+  }
+
+  @Test
   void preservesLegacyJsonPayloadAndQosFields() {
     ReplayEvent event = NdjsonReplayDecoder.decode(
         "{\"topic\":\"a/b\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\","

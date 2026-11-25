@@ -63,6 +63,29 @@ class MqttReplayMainTest {
   }
 
   @Test
+  void skipsWildcardPublishTopicAndContinues() throws Exception {
+    String timestamp = "\"receivedTimestamp\":\"2026-09-01T00:00:00Z\"";
+    Files.writeString(directory.resolve("events.ndjson"),
+        "{\"topic\":\"sensors/+/data\"," + timestamp + ",\"payload\":1}\n"
+            + "{\"topic\":\"sensors/device/data\"," + timestamp + ",\"payload\":2}\n");
+    java.io.PrintStream previous = System.err;
+    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+    try (java.io.PrintStream errors = new java.io.PrintStream(output, true, StandardCharsets.UTF_8)) {
+      System.setErr(errors);
+      try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 0)) {
+        assertEquals("sensors/device/data", reader.next().topic());
+        assertNull(reader.next());
+        assertEquals(1L, reader.skippedRecords());
+      }
+    } finally {
+      System.setErr(previous);
+    }
+    String error = output.toString(StandardCharsets.UTF_8);
+    assertTrue(error.contains("events.ndjson:1"));
+    assertTrue(error.contains("sensors/+/data"));
+  }
+
+  @Test
   void skipsInvalidRecordInsideGzipAndContinues() throws Exception {
     String content = "{\"topic\":\"a\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":1}\n"
         + "{\"topic\":\"invalid\"}\n"
