@@ -7,7 +7,8 @@ import java.util.List;
 
 public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
                             String sessionPrefix, int qos, List<String> observeUrls,
-                            String observeTopic, long drainMillis, Path report, boolean noDelay) {
+                            String observeTopic, long drainMillis, Path report, boolean noDelay,
+                            long sessionIdleMillis) {
   public ReplayOptions {
     observeUrls = List.copyOf(observeUrls);
   }
@@ -17,6 +18,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     String broker = null;
     double speed = 1.0;
     boolean noDelay = false;
+    long sessionIdleMillis = 60000;
     boolean sessionPerTopic = false;
     String sessionPrefix = null;
     int qos = 1;
@@ -34,6 +36,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
         case "--no-delay" -> noDelay = true;
         case "--session-per-topic" -> sessionPerTopic = true;
         case "--session-prefix" -> sessionPrefix = value(arguments, ++i, option);
+        case "--session-idle-ms" -> sessionIdleMillis = Long.parseLong(value(arguments, ++i, option));
         case "--qos" -> qos = Integer.parseInt(value(arguments, ++i, option));
         case "--observe" -> observeUrls.add(BrokerUrl.normalize(value(arguments, ++i, option)));
         case "--observe-topic" -> observeTopic = value(arguments, ++i, option);
@@ -65,6 +68,9 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     if (qos < 0 || qos > 2) {
       throw new IllegalArgumentException("--qos must be 0, 1 or 2");
     }
+    if (sessionIdleMillis <= 0) {
+      throw new IllegalArgumentException("--session-idle-ms must be positive");
+    }
     if (drainMillis < 0) {
       throw new IllegalArgumentException("--drain-ms must be non-negative");
     }
@@ -72,7 +78,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
       throw new IllegalArgumentException("--observe-topic must not be blank");
     }
     return new ReplayOptions(directory, broker, speed, sessionPerTopic, sessionPrefix, qos,
-        observeUrls, observeTopic, drainMillis, report, noDelay);
+        observeUrls, observeTopic, drainMillis, report, noDelay, sessionIdleMillis);
   }
 
   private static String value(String[] arguments, int index, String option) {

@@ -23,6 +23,7 @@ Both `maps-mqtt-mesh-test` and the backwards-compatible `maps-mqtt-replay` launc
 - `--no-delay`: Publish events back-to-back, with no intentional timestamp-based waits. Overrides timing from `--speed` if both are supplied; MQTT publication itself can still block.
 - `--session-per-topic`: One publishing session per complete topic.
 - `--session-prefix`: One publishing session per immediate child beneath the configured path. Mutually exclusive with `--session-per-topic`.
+- `--session-idle-ms`: Close idle publishing connections after this many milliseconds (default `60000`); the session is recreated on its next event. The reported session count is the number of currently open connections.
 - `--qos`: Default QoS if absent from the recording, default `1`.
 - `--observe URL`: Repeatable. With no occurrences, replay-only mode has no validation overhead.
 - `--observe-topic`: One MQTT topic filter used on every observation point, default `#`. Use a filter that covers **every** published topic to avoid false missing-message results.

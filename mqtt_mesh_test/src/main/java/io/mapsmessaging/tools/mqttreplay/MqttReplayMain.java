@@ -28,7 +28,7 @@ public final class MqttReplayMain {
     ReplayScheduler scheduler = new ReplayScheduler(options.speed(), options.noDelay());
     try (ValidationCoordinator validation = new ValidationCoordinator(options);
          NdjsonReplayReader reader = new NdjsonReplayReader(options.directory(), options.qos());
-         MqttReplayPublisher publisher = new MqttReplayPublisher(options.broker(), options.sessionPerTopic(), options.sessionPrefix())) {
+         MqttReplayPublisher publisher = new MqttReplayPublisher(options.broker(), options.sessionPerTopic(), options.sessionPrefix(), options.sessionIdleMillis())) {
       validation.start();
       long lastReportNanos = System.nanoTime();
       ReplayEvent event;

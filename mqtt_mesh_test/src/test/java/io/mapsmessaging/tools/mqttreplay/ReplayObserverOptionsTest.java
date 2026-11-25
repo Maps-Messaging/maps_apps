@@ -17,6 +17,7 @@ class ReplayObserverOptionsTest {
     ReplayOptions options = ReplayOptions.parse(new String[]{
         "--dir", directory.toString(), "--broker", "tcp://localhost:1883"});
     assertFalse(options.noDelay());
+    assertEquals(60000L, options.sessionIdleMillis());
     assertEquals(0, options.observeUrls().size());
     assertEquals("#", options.observeTopic());
     assertEquals(5000, options.drainMillis());
@@ -41,6 +42,17 @@ class ReplayObserverOptionsTest {
         "--speed", "400", "--no-delay"});
     assertTrue(options.noDelay());
     assertEquals(400.0, options.speed());
+  }
+
+  @Test
+  void configuresSessionIdleTimeout() {
+    ReplayOptions options = ReplayOptions.parse(new String[]{
+        "--dir", directory.toString(), "--broker", "tcp://localhost:1883",
+        "--session-idle-ms", "120000"});
+    assertEquals(120000L, options.sessionIdleMillis());
+    assertThrows(IllegalArgumentException.class, () -> ReplayOptions.parse(new String[]{
+        "--dir", directory.toString(), "--broker", "tcp://localhost:1883",
+        "--session-idle-ms", "0"}));
   }
 
   @Test

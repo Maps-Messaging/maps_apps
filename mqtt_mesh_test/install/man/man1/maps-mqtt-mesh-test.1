@@ -61,6 +61,11 @@ or without both a child folder and a topic below it, are rejected.
 Mutually exclusive with
 .BR --session-per-topic .
 .TP
+.BI --session-idle-ms " milliseconds"
+Disconnect and close publishing sessions that have not published for the
+configured interval. Default: 60000 ms. Must be positive. Closed sessions
+are recreated on demand. The progress session count reflects open connections.
+.TP
 .BI --qos " 0|1|2"
 Fallback publishing QoS when the recording has none. Default: 1.
 Recorded QoS and retain values are used when available.
