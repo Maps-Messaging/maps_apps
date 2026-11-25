@@ -295,7 +295,7 @@ Version: ${DEBIAN_VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCHITECTURE}
-Depends: maps, systemd
+Depends: systemd
 Maintainer: MapsMessaging B.V. <matthew.buckton@mapsmessaging.io>
 Homepage: https://www.mapsmessaging.io
 Description: MapsMessaging command-line applications
