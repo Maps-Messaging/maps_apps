@@ -20,6 +20,7 @@ Both `maps-mqtt-mesh-test` and the backwards-compatible `maps-mqtt-replay` launc
 - `--dir`: Directory of timestamp-ordered `.ndjson` and `.ndjson.gz` files (scanned recursively, streaming merge).
 - `--broker`: MQTT 3.1.1 publishing URL.
 - `--speed`: Replay factor, default `1.0`; existing timing and publish-session behaviour is unchanged.
+- `--no-delay`: Publish events back-to-back, with no intentional timestamp-based waits. Overrides timing from `--speed` if both are supplied; MQTT publication itself can still block.
 - `--session-per-topic`: One publishing session per complete topic.
 - `--session-prefix`: One publishing session per immediate child beneath the configured path. Mutually exclusive with `--session-per-topic`.
 - `--qos`: Default QoS if absent from the recording, default `1`.

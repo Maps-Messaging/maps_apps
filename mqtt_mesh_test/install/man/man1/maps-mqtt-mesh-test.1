@@ -40,6 +40,13 @@ Replay speed multiplier. Default: 1.0. Must be finite and greater than zero.
 For example, 100 compresses recorded timestamp intervals by a factor of 100.
 Actual throughput is limited by publishing and broker performance.
 .TP
+.B --no-delay
+Publish events back-to-back without intentional timestamp waits.
+If given with
+.BR --speed ,
+no-delay takes precedence. MQTT publishing and acknowledgements can still
+limit actual throughput.
+.TP
 .B --session-per-topic
 Use one MQTT publishing client session for each distinct full topic.
 Mutually exclusive with

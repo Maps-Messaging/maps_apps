@@ -1,6 +1,8 @@
 package io.mapsmessaging.tools.mqttreplay;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Path;
@@ -14,6 +16,7 @@ class ReplayObserverOptionsTest {
   void defaultsToReplayOnly() {
     ReplayOptions options = ReplayOptions.parse(new String[]{
         "--dir", directory.toString(), "--broker", "tcp://localhost:1883"});
+    assertFalse(options.noDelay());
     assertEquals(0, options.observeUrls().size());
     assertEquals("#", options.observeTopic());
     assertEquals(5000, options.drainMillis());
@@ -29,6 +32,15 @@ class ReplayObserverOptionsTest {
     assertEquals("/repmus/#", options.observeTopic());
     assertEquals(9000, options.drainMillis());
     assertEquals(Path.of("report.json"), options.report());
+  }
+
+  @Test
+  void acceptsNoDelayAlongsideSpeed() {
+    ReplayOptions options = ReplayOptions.parse(new String[]{
+        "--dir", directory.toString(), "--broker", "tcp://localhost:1883",
+        "--speed", "400", "--no-delay"});
+    assertTrue(options.noDelay());
+    assertEquals(400.0, options.speed());
   }
 
   @Test

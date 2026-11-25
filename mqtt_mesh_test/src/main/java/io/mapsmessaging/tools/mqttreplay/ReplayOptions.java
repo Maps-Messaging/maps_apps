@@ -7,7 +7,7 @@ import java.util.List;
 
 public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
                             String sessionPrefix, int qos, List<String> observeUrls,
-                            String observeTopic, long drainMillis, Path report) {
+                            String observeTopic, long drainMillis, Path report, boolean noDelay) {
   public ReplayOptions {
     observeUrls = List.copyOf(observeUrls);
   }
@@ -16,6 +16,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     Path directory = null;
     String broker = null;
     double speed = 1.0;
+    boolean noDelay = false;
     boolean sessionPerTopic = false;
     String sessionPrefix = null;
     int qos = 1;
@@ -30,6 +31,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
         case "--dir" -> directory = Path.of(value(arguments, ++i, option));
         case "--broker" -> broker = BrokerUrl.normalize(value(arguments, ++i, option));
         case "--speed" -> speed = Double.parseDouble(value(arguments, ++i, option));
+        case "--no-delay" -> noDelay = true;
         case "--session-per-topic" -> sessionPerTopic = true;
         case "--session-prefix" -> sessionPrefix = value(arguments, ++i, option);
         case "--qos" -> qos = Integer.parseInt(value(arguments, ++i, option));
@@ -70,7 +72,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
       throw new IllegalArgumentException("--observe-topic must not be blank");
     }
     return new ReplayOptions(directory, broker, speed, sessionPerTopic, sessionPrefix, qos,
-        observeUrls, observeTopic, drainMillis, report);
+        observeUrls, observeTopic, drainMillis, report, noDelay);
   }
 
   private static String value(String[] arguments, int index, String option) {

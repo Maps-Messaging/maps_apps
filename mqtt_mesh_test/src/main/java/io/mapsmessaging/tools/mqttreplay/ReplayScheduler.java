@@ -6,14 +6,19 @@ import java.util.concurrent.TimeUnit;
 
 final class ReplayScheduler {
   private final double speed;
+  private final boolean noDelay;
   private final long started = System.nanoTime();
   private Instant first;
 
-  ReplayScheduler(double speed) {
+  ReplayScheduler(double speed, boolean noDelay) {
     this.speed = speed;
+    this.noDelay = noDelay;
   }
 
   void await(Instant timestamp) throws InterruptedException {
+    if (noDelay) {
+      return;
+    }
     if (first == null) {
       first = timestamp;
     }
