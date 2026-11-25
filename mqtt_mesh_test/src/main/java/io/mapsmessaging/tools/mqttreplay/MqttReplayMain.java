@@ -14,6 +14,11 @@ public final class MqttReplayMain {
       System.exit(130);
     } catch (Exception exception) {
       System.err.println("Replay failed: " + exception.getMessage());
+      Throwable cause = exception.getCause();
+      while (cause != null) {
+        System.err.println("Caused by: " + cause.getClass().getSimpleName() + ": " + cause.getMessage());
+        cause = cause.getCause();
+      }
       System.exit(1);
     }
   }
