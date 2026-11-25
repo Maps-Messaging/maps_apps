@@ -11,6 +11,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.PriorityQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
@@ -32,8 +36,10 @@ public final class NdjsonReplayReader implements AutoCloseable {
       if (files.isEmpty()) {
         throw new IOException("No .ndjson or .ndjson.gz files in " + directory);
       }
-      for (Path file : files) {
-        Source source = new Source(file, sources.size(), qos);
+      List<Long> counts = countRecords(files);
+      for (int i = 0; i < files.size(); i++) {
+        Path file = files.get(i);
+        Source source = new Source(file, sources.size(), qos, counts.get(i));
         System.out.printf("Opening replay log %d/%d: %s (%,d records)%n",
             source.index + 1, files.size(), file, source.totalRecords);
         sources.add(source);
@@ -48,6 +54,38 @@ public final class NdjsonReplayReader implements AutoCloseable {
         exception.addSuppressed(cleanup);
       }
       throw exception;
+    }
+  }
+
+  private static List<Long> countRecords(List<Path> files) throws IOException {
+    int workers = Math.min(files.size(), Math.min(Runtime.getRuntime().availableProcessors(), 8));
+    ExecutorService executor = Executors.newFixedThreadPool(Math.max(1, workers));
+    List<Future<Long>> futures = new ArrayList<>(files.size());
+    try {
+      for (Path file : files) {
+        futures.add(executor.submit(() -> Source.countRecords(file)));
+      }
+      List<Long> counts = new ArrayList<>(files.size());
+      for (Future<Long> future : futures) {
+        try {
+          counts.add(future.get());
+        } catch (InterruptedException exception) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted while counting replay records", exception);
+        } catch (ExecutionException exception) {
+          Throwable cause = exception.getCause();
+          if (cause instanceof IOException ioException) {
+            throw ioException;
+          }
+          throw new IOException("Unable to count replay records", cause);
+        }
+      }
+      return counts;
+    } finally {
+      for (Future<Long> future : futures) {
+        future.cancel(true);
+      }
+      executor.shutdownNow();
     }
   }
 
@@ -113,10 +151,15 @@ public final class NdjsonReplayReader implements AutoCloseable {
     private long skippedRecords;
     private ReplayEvent current;
 
-    Source(Path path, int index, int qos) throws IOException {
+    Source(Path path, int index, int qos, long totalRecords) throws IOException {
       this.path = path;
       this.index = index;
       this.qos = qos;
+      this.totalRecords = totalRecords;
+      this.reader = open(path);
+    }
+
+    private static long countRecords(Path path) throws IOException {
       try (BufferedReader counter = open(path)) {
         long count = 0;
         String line;
@@ -124,10 +167,12 @@ public final class NdjsonReplayReader implements AutoCloseable {
           if (!line.isBlank()) {
             count++;
           }
+          if (Thread.currentThread().isInterrupted()) {
+            throw new IOException("Interrupted while counting " + path);
+          }
         }
-        totalRecords = count;
+        return count;
       }
-      this.reader = open(path);
     }
 
     private static BufferedReader open(Path path) throws IOException {

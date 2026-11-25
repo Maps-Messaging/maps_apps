@@ -68,6 +68,31 @@ class MqttReplayMainTest {
   }
 
   @Test
+  void countsManyFilesWithoutChangingMergeOrder() throws Exception {
+    for (int i = 11; i >= 0; i--) {
+      String event = "{\"topic\":\"unit/" + i + "\",\"receivedTimestamp\":\"2026-09-01T00:00:"
+          + String.format("%02d", i) + "Z\",\"payload\":" + i + "}\n";
+      Path file = directory.resolve(String.format("%02d.ndjson", i));
+      if (i % 2 == 0) {
+        try (GZIPOutputStream output = new GZIPOutputStream(Files.newOutputStream(directory.resolve(
+            String.format("%02d.ndjson.gz", i))))) {
+          output.write(("\n" + event).getBytes(StandardCharsets.UTF_8));
+        }
+      } else {
+        Files.writeString(file, "\n" + event);
+      }
+    }
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 1)) {
+      assertEquals(12L, reader.totalRecords());
+      for (int i = 0; i < 12; i++) {
+        assertEquals("unit/" + i, reader.next().topic());
+      }
+      assertNull(reader.next());
+      assertEquals(12L, reader.recordsRead());
+    }
+  }
+
+  @Test
   void skipsMalformedRecordsAndContinuesWithLaterEvents() throws Exception {
     String malformed = "{\"topic\":\"bad\",\"payload\":1}\n";
     String first = "{\"topic\":\"valid\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":2}\n";
