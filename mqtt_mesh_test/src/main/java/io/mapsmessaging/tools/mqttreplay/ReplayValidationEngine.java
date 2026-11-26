@@ -22,8 +22,14 @@ final class ReplayValidationEngine {
   }
 
   void published(String topic, byte[] payload) {
+    published(topic, payload, observers.keySet());
+  }
+
+  void published(String topic, byte[] payload, Iterable<String> targets) {
     MessageKey key = MessageKey.of(topic, payload);
-    for (ObserverState observer : observers.values()) {
+    for (String target : targets) {
+      ObserverState observer = observers.get(target);
+      observer.expected.increment();
       observer.pending.compute(key, (ignored, count) -> {
         long previous = count == null ? 0 : count;
         if (previous < 0) {
@@ -88,12 +94,12 @@ final class ReplayValidationEngine {
     List<ObserverProgress> result = new ArrayList<>(observers.size());
     for (Map.Entry<String, ObserverState> entry : observers.entrySet()) {
       ObserverState observer = entry.getValue();
-      result.add(new ObserverProgress(entry.getKey(), observer.received.sum(), observer.matched.sum()));
+      result.add(new ObserverProgress(entry.getKey(), observer.received.sum(), observer.matched.sum(), observer.expected.sum()));
     }
     return result;
   }
 
-  record ObserverProgress(String name, long received, long matched) {
+  record ObserverProgress(String name, long received, long matched, long expected) {
   }
 
   int pendingKeyCount(String observerName) {
@@ -106,6 +112,7 @@ final class ReplayValidationEngine {
 
   private static final class ObserverState {
     private final ConcurrentHashMap<MessageKey, Long> pending = new ConcurrentHashMap<>();
+    private final LongAdder expected = new LongAdder();
     private final LongAdder received = new LongAdder();
     private final LongAdder matched = new LongAdder();
   }

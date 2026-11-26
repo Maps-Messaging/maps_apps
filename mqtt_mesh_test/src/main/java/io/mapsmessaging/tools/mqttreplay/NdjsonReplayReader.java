@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +23,11 @@ import java.util.zip.GZIPInputStream;
 public final class NdjsonReplayReader implements AutoCloseable {
   private final List<Source> sources = new ArrayList<>();
   private LargestPacket largestPacket;
+  private final Map<String, Long> topicCounts = new HashMap<>();
+
+  Map<String, Long> topicCounts() {
+    return Map.copyOf(topicCounts);
+  }
   private final PriorityQueue<Source> queue = new PriorityQueue<>(
       Comparator.comparing((Source source) -> source.current.timestamp())
           .thenComparingInt(source -> source.index));
@@ -39,6 +46,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
       }
       List<ScanResult> scans = scanFiles(files, qos);
       for (ScanResult scan : scans) {
+        scan.topicCounts().forEach((topic, count) -> topicCounts.merge(topic, count, Long::sum));
         if (scan.largestPacket() != null && (largestPacket == null || scan.largestPacket().packetBytes() > largestPacket.packetBytes())) {
           largestPacket = scan.largestPacket();
         }
@@ -110,7 +118,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
   record LargestPacket(long packetBytes, int payloadBytes, int qos, String topic, Path path, long lineNumber) {
   }
 
-  private record ScanResult(long totalRecords, LargestPacket largestPacket) {
+  private record ScanResult(long totalRecords, LargestPacket largestPacket, Map<String, Long> topicCounts) {
   }
 
   LargestPacket largestPacket() {
@@ -192,6 +200,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
         long count = 0;
         long lineNumber = 0;
         LargestPacket largest = null;
+        Map<String, Long> counts = new HashMap<>();
         String line;
         while ((line = counter.readLine()) != null) {
           lineNumber++;
@@ -199,6 +208,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
             count++;
             try {
               ReplayEvent event = NdjsonReplayDecoder.decode(line, qos);
+              counts.merge(event.topic(), 1L, Long::sum);
               long bytes = packetBytes(event);
               if (largest == null || bytes > largest.packetBytes()) {
                 largest = new LargestPacket(bytes, event.payload().length, event.qos(), event.topic(), path, lineNumber);
@@ -211,7 +221,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
             throw new IOException("Interrupted while scanning " + path);
           }
         }
-        return new ScanResult(count, largest);
+        return new ScanResult(count, largest, counts);
       }
     }
 

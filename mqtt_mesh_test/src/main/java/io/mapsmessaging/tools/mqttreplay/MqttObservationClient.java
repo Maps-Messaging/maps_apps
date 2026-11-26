@@ -1,6 +1,9 @@
 package io.mapsmessaging.tools.mqttreplay;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import org.eclipse.paho.client.mqttv3.IMqttToken;
 import java.util.concurrent.atomic.AtomicReference;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
@@ -16,6 +19,7 @@ final class MqttObservationClient implements AutoCloseable {
   private final MqttAsyncClient client;
   private final AtomicReference<String> failure = new AtomicReference<>();
   private final ReplayValidationEngine engine;
+  private final AtomicLong lastReceived = new AtomicLong();
 
   MqttObservationClient(String name, String url, ReplayValidationEngine engine) throws Exception {
     this.name = name;
@@ -24,11 +28,15 @@ final class MqttObservationClient implements AutoCloseable {
     client.setCallback(new MqttCallback() {
       @Override
       public void connectionLost(Throwable cause) {
-        failure.compareAndSet(null, cause == null ? "Connection lost" : "Connection lost: " + cause.getMessage());
+        String message = cause == null ? "Connection lost" : "Connection lost: " + cause.getMessage();
+        if (failure.compareAndSet(null, message)) {
+          System.err.println(name + ": " + message);
+        }
       }
 
       @Override
       public void messageArrived(String topic, MqttMessage message) {
+        lastReceived.set(System.nanoTime());
         MqttObservationClient.this.engine.received(MqttObservationClient.this.name, topic, message.getPayload());
       }
 
@@ -38,13 +46,29 @@ final class MqttObservationClient implements AutoCloseable {
     });
   }
 
-  void start(String topicFilter) throws Exception {
+  void start(List<String> filters) throws Exception {
     MqttConnectOptions options = new MqttConnectOptions();
     options.setMqttVersion(MqttConnectOptions.MQTT_VERSION_3_1_1);
     options.setCleanSession(true);
     options.setAutomaticReconnect(false);
     client.connect(options).waitForCompletion(OPERATION_TIMEOUT_MS);
-    client.subscribe(topicFilter, 1).waitForCompletion(OPERATION_TIMEOUT_MS);
+    for (String filter : filters) {
+      IMqttToken token = client.subscribe(filter, 1);
+      token.waitForCompletion(OPERATION_TIMEOUT_MS);
+      int[] granted = token.getGrantedQos();
+      if (granted == null || granted.length != 1 || granted[0] < 0 || granted[0] > 1) {
+        failure.set("Subscription rejected: " + filter);
+        throw new IllegalStateException(name + ": " + failure.get());
+      }
+    }
+  }
+
+  boolean connected() {
+    return client.isConnected();
+  }
+
+  long lastReceived() {
+    return lastReceived.get();
   }
 
   String failure() {

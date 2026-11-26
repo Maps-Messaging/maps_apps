@@ -8,9 +8,12 @@ import java.util.List;
 public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
                             String sessionPrefix, int qos, List<String> observeUrls,
                             String observeTopic, long drainMillis, Path report, boolean noDelay,
-                            long sessionIdleMillis, int sessions, int queueDepth) {
+                            long sessionIdleMillis, int sessions, int queueDepth, int subscriberSessions) {
   public ReplayOptions {
     observeUrls = List.copyOf(observeUrls);
+    if (subscriberSessions < 1) {
+      throw new IllegalArgumentException("--subscriber-sessions must be positive");
+    }
   }
 
   public ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
@@ -19,6 +22,14 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
                        long sessionIdleMillis) {
     this(directory, broker, speed, sessionPerTopic, sessionPrefix, qos, observeUrls,
         observeTopic, drainMillis, report, noDelay, sessionIdleMillis, 0, 100);
+  }
+
+  public ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
+                       String sessionPrefix, int qos, List<String> observeUrls,
+                       String observeTopic, long drainMillis, Path report, boolean noDelay,
+                       long sessionIdleMillis, int sessions, int queueDepth) {
+    this(directory, broker, speed, sessionPerTopic, sessionPrefix, qos, observeUrls,
+        observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth, 1);
   }
 
   public static ReplayOptions parse(String[] arguments) {
@@ -32,6 +43,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     int qos = 0;
     int sessions = 0;
     int queueDepth = 100;
+    int subscriberSessions = 1;
     List<String> observeUrls = new ArrayList<>();
     String observeTopic = "#";
     long drainMillis = 5000;
@@ -53,6 +65,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
             throw new IllegalArgumentException("--sessions must be positive");
           }
         }
+        case "--subscriber-sessions" -> subscriberSessions = Integer.parseInt(value(arguments, ++i, option));
         case "--queue-depth" -> queueDepth = Integer.parseInt(value(arguments, ++i, option));
         case "--qos" -> qos = Integer.parseInt(value(arguments, ++i, option));
         case "--observe" -> observeUrls.add(BrokerUrl.normalize(value(arguments, ++i, option)));
@@ -101,7 +114,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
       throw new IllegalArgumentException("--observe-topic must not be blank");
     }
     return new ReplayOptions(directory, broker, speed, sessionPerTopic, sessionPrefix, qos,
-        observeUrls, observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth);
+        observeUrls, observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth, subscriberSessions);
   }
 
   private static String value(String[] arguments, int index, String option) {

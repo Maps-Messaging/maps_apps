@@ -28,6 +28,7 @@ Both `maps-mqtt-mesh-test` and the backwards-compatible `maps-mqtt-replay` launc
 - `--session-idle-ms`: Close idle dynamic publishing connections after this many milliseconds (default `60000`); the session is recreated on its next event. The reported session count is the number of currently open dynamic connections or configured fixed sessions.
 - `--qos`: Default QoS if absent from the recording, default `0`.
 - `--observe URL`: Repeatable. With no occurrences, replay-only mode has no validation overhead.
+- `--subscriber-sessions N`: Independent subscriber sessions per observation broker (default 1). Larger pools partition recorded topics by event counts; no shared subscriptions.
 - `--observe-topic`: One MQTT topic filter used on every observation point, default `#`. Use a filter that covers **every** published topic to avoid false missing-message results.
 - `--drain-ms`: Additional receive time after the last publication, default `5000` ms.
 - `--report`: Optional path for a pretty-printed JSON validation report; reports also go to stdout.

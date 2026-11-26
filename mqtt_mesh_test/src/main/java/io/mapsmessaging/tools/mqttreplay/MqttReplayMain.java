@@ -27,8 +27,8 @@ public final class MqttReplayMain {
     long count = 0;
     long lastCompleted = 0;
     ReplayScheduler scheduler = new ReplayScheduler(options.speed(), options.noDelay());
-    try (ValidationCoordinator validation = new ValidationCoordinator(options);
-         NdjsonReplayReader reader = new NdjsonReplayReader(options.directory(), options.qos());
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(options.directory(), options.qos());
+         ValidationCoordinator validation = new ValidationCoordinator(options, reader.topicCounts());
          MqttReplayPublisher publisher = new MqttReplayPublisher(options.broker(), options.sessionPerTopic(), options.sessionPrefix(), options.sessionIdleMillis(), options.sessions(), options.queueDepth(),
              event -> {
                if (!options.observeUrls().isEmpty()) {
