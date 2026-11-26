@@ -20,7 +20,6 @@
 package io.mapsmessaging.app.top.network;
 
 import com.google.gson.*;
-import io.mapsmessaging.utilities.GsonFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -37,7 +36,7 @@ public abstract class RestApiConnection {
   protected RestApiConnection(String url, String endpoint) {
     this.url = url;
     this.endpoint = endpoint;
-    this.gson = GsonFactory.getInstance().getPrettyGson();
+    this.gson = new GsonBuilder().setPrettyPrinting().create();
   }
 
   public abstract Object parse(JsonElement jsonElement) throws JsonParseException;

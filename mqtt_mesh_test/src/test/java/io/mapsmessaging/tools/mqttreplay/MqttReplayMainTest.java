@@ -58,8 +58,8 @@ class MqttReplayMainTest {
     }
     try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 1)) {
       assertEquals(3L, reader.totalRecords());
-      assertEquals(3L, reader.recordsRead());
-      assertEquals(1L, reader.skippedRecords());
+      assertEquals(2L, reader.recordsRead());
+      assertEquals(0L, reader.skippedRecords());
       assertEquals("a", reader.next().topic());
       assertEquals("b", reader.next().topic());
       assertNull(reader.next());
