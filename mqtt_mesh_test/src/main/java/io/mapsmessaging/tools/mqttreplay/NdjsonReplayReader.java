@@ -20,6 +20,7 @@ import java.util.zip.GZIPInputStream;
 
 public final class NdjsonReplayReader implements AutoCloseable {
   private final List<Source> sources = new ArrayList<>();
+  private LargestPacket largestPacket;
   private final PriorityQueue<Source> queue = new PriorityQueue<>(
       Comparator.comparing((Source source) -> source.current.timestamp())
           .thenComparingInt(source -> source.index));
@@ -36,10 +37,20 @@ public final class NdjsonReplayReader implements AutoCloseable {
       if (files.isEmpty()) {
         throw new IOException("No .ndjson or .ndjson.gz files in " + directory);
       }
-      List<Long> counts = countRecords(files);
+      List<ScanResult> scans = scanFiles(files, qos);
+      for (ScanResult scan : scans) {
+        if (scan.largestPacket() != null && (largestPacket == null || scan.largestPacket().packetBytes() > largestPacket.packetBytes())) {
+          largestPacket = scan.largestPacket();
+        }
+      }
+      if (largestPacket != null) {
+        System.out.printf("Largest MQTT 3.1.1 PUBLISH packet: %,d bytes (payload %,d bytes, QoS %d), topic: %s, file: %s:%d%n",
+            largestPacket.packetBytes(), largestPacket.payloadBytes(), largestPacket.qos(),
+            largestPacket.topic(), largestPacket.path(), largestPacket.lineNumber());
+      }
       for (int i = 0; i < files.size(); i++) {
         Path file = files.get(i);
-        Source source = new Source(file, sources.size(), qos, counts.get(i));
+        Source source = new Source(file, sources.size(), qos, scans.get(i).totalRecords());
         System.out.printf("Opening replay log %d/%d: %s (%,d records)%n",
             source.index + 1, files.size(), file, source.totalRecords);
         sources.add(source);
@@ -57,18 +68,18 @@ public final class NdjsonReplayReader implements AutoCloseable {
     }
   }
 
-  private static List<Long> countRecords(List<Path> files) throws IOException {
+  private static List<ScanResult> scanFiles(List<Path> files, int qos) throws IOException {
     int workers = Math.min(files.size(), Math.min(Runtime.getRuntime().availableProcessors(), 8));
     ExecutorService executor = Executors.newFixedThreadPool(Math.max(1, workers));
-    List<Future<Long>> futures = new ArrayList<>(files.size());
+    List<Future<ScanResult>> futures = new ArrayList<>(files.size());
     try {
       for (Path file : files) {
-        futures.add(executor.submit(() -> Source.countRecords(file)));
+        futures.add(executor.submit(() -> Source.scan(file, qos)));
       }
-      List<Long> counts = new ArrayList<>(files.size());
-      for (Future<Long> future : futures) {
+      List<ScanResult> scans = new ArrayList<>(files.size());
+      for (Future<ScanResult> future : futures) {
         try {
-          counts.add(future.get());
+          scans.add(future.get());
         } catch (InterruptedException exception) {
           Thread.currentThread().interrupt();
           throw new IOException("Interrupted while counting replay records", exception);
@@ -80,13 +91,30 @@ public final class NdjsonReplayReader implements AutoCloseable {
           throw new IOException("Unable to count replay records", cause);
         }
       }
-      return counts;
+      return scans;
     } finally {
-      for (Future<Long> future : futures) {
+      for (Future<ScanResult> future : futures) {
         future.cancel(true);
       }
       executor.shutdownNow();
     }
+  }
+
+  static long packetBytes(ReplayEvent event) {
+    long remaining = 2L + event.topic().getBytes(StandardCharsets.UTF_8).length
+        + (event.qos() == 0 ? 0 : 2) + event.payload().length;
+    int lengthBytes = remaining < 128 ? 1 : remaining < 16384 ? 2 : remaining < 2097152 ? 3 : 4;
+    return 1L + lengthBytes + remaining;
+  }
+
+  record LargestPacket(long packetBytes, int payloadBytes, int qos, String topic, Path path, long lineNumber) {
+  }
+
+  private record ScanResult(long totalRecords, LargestPacket largestPacket) {
+  }
+
+  LargestPacket largestPacket() {
+    return largestPacket;
   }
 
   private static boolean supported(Path path) {
@@ -159,19 +187,31 @@ public final class NdjsonReplayReader implements AutoCloseable {
       this.reader = open(path);
     }
 
-    private static long countRecords(Path path) throws IOException {
+    private static ScanResult scan(Path path, int qos) throws IOException {
       try (BufferedReader counter = open(path)) {
         long count = 0;
+        long lineNumber = 0;
+        LargestPacket largest = null;
         String line;
         while ((line = counter.readLine()) != null) {
+          lineNumber++;
           if (!line.isBlank()) {
             count++;
+            try {
+              ReplayEvent event = NdjsonReplayDecoder.decode(line, qos);
+              long bytes = packetBytes(event);
+              if (largest == null || bytes > largest.packetBytes()) {
+                largest = new LargestPacket(bytes, event.payload().length, event.qos(), event.topic(), path, lineNumber);
+              }
+            } catch (RuntimeException ignored) {
+              // Match the replay path: invalid records are counted but skipped when publishing.
+            }
           }
           if (Thread.currentThread().isInterrupted()) {
-            throw new IOException("Interrupted while counting " + path);
+            throw new IOException("Interrupted while scanning " + path);
           }
         }
-        return count;
+        return new ScanResult(count, largest);
       }
     }
 

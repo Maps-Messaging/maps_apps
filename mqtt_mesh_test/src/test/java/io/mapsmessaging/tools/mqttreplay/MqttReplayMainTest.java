@@ -93,6 +93,37 @@ class MqttReplayMainTest {
   }
 
   @Test
+  void reportsLargestFullMqttPublishPacketAcrossPlainAndGzipFiles() throws Exception {
+    String small = "{\"topic\":\"small\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":\"x\"}\n";
+    String large = "{\"topic\":\"sensor/é\",\"receivedTimestamp\":\"2026-09-01T00:00:01Z\",\"qos\":1,\"payload\":\""
+        + "x".repeat(120) + "\"}\n";
+    Files.writeString(directory.resolve("a.ndjson"), small);
+    try (GZIPOutputStream output = new GZIPOutputStream(Files.newOutputStream(directory.resolve("b.ndjson.gz")))) {
+      output.write(("\n" + large + "{\"topic\":\"bad\",\"payload\":\"" + "z".repeat(300) + "\"}\n")
+          .getBytes(StandardCharsets.UTF_8));
+    }
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 0)) {
+      NdjsonReplayReader.LargestPacket largest = reader.largestPacket();
+      assertNotNull(largest);
+      assertEquals("sensor/é", largest.topic());
+      assertEquals(136L, largest.packetBytes());
+      assertEquals(120, largest.payloadBytes());
+      assertEquals(1, largest.qos());
+      assertEquals("b.ndjson.gz", largest.path().getFileName().toString());
+      assertEquals(2L, largest.lineNumber());
+      assertEquals(3L, reader.totalRecords());
+    }
+  }
+
+  @Test
+  void includesMqttRemainingLengthEncodingBoundary() {
+    ReplayEvent shortEvent = new ReplayEvent(Instant.EPOCH, "a", new byte[124], 0, false);
+    ReplayEvent longEvent = new ReplayEvent(Instant.EPOCH, "a", new byte[125], 0, false);
+    assertEquals(129L, NdjsonReplayReader.packetBytes(shortEvent));
+    assertEquals(131L, NdjsonReplayReader.packetBytes(longEvent));
+  }
+
+  @Test
   void skipsMalformedRecordsAndContinuesWithLaterEvents() throws Exception {
     String malformed = "{\"topic\":\"bad\",\"payload\":1}\n";
     String first = "{\"topic\":\"valid\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":2}\n";

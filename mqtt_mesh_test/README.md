@@ -17,7 +17,7 @@ Both `maps-mqtt-mesh-test` and the backwards-compatible `maps-mqtt-replay` launc
 
 ## Options
 
-- `--dir`: Directory of timestamp-ordered `.ndjson` and `.ndjson.gz` files (scanned recursively, streaming merge).
+- `--dir`: Directory of timestamp-ordered `.ndjson` and `.ndjson.gz` files (scanned recursively, streaming merge). The parallel startup scan counts records and reports the largest valid MQTT 3.1.1 PUBLISH packet, including topic, file and line number, before publishing begins. Packet size includes the MQTT fixed header, encoded remaining length, UTF-8 topic, QoS packet identifier and payload. The scan decodes each record once and may take longer than counting lines alone.
 - `--broker`: MQTT 3.1.1 publishing URL.
 - `--speed`: Replay factor, default `1.0`; existing timing and publish-session behaviour is unchanged.
 - `--no-delay`: Publish events back-to-back, with no intentional timestamp-based waits. Overrides timing from `--speed` if both are supplied; MQTT publication itself can still block.
