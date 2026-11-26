@@ -8,14 +8,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 public final class MqttReplayPublisher implements AutoCloseable {
   private final PublishingPool pool;
   private final String broker;
+  private final String mqttVersion;
   private final boolean sessionPerTopic;
   private final String sessionPrefix;
   private final long idleNanos;
@@ -28,7 +25,13 @@ public final class MqttReplayPublisher implements AutoCloseable {
 
   MqttReplayPublisher(String broker, boolean sessionPerTopic, String sessionPrefix, long sessionIdleMillis,
                       int sessions, int queueDepth, Consumer<ReplayEvent> completed) {
+    this(broker, sessionPerTopic, sessionPrefix, sessionIdleMillis, sessions, queueDepth, completed, "3.1.1");
+  }
+
+  MqttReplayPublisher(String broker, boolean sessionPerTopic, String sessionPrefix, long sessionIdleMillis,
+                      int sessions, int queueDepth, Consumer<ReplayEvent> completed, String mqttVersion) {
     this.broker = broker;
+    this.mqttVersion = mqttVersion;
     this.sessionPerTopic = sessionPerTopic;
     this.sessionPrefix = sessionPrefix;
     this.idleNanos = TimeUnit.MILLISECONDS.toNanos(sessionIdleMillis);
@@ -39,7 +42,7 @@ public final class MqttReplayPublisher implements AutoCloseable {
     });
     long interval = Math.max(1L, Math.min(5000L, sessionIdleMillis / 2));
     pool = sessions == 0 ? null : new PublishingPool(sessions, queueDepth, index -> {
-      MqttClient client = connectClient(true);
+      MqttWireClient client = connectClient(true);
       return new PublishingPool.Session() {
         public void publish(ReplayEvent event) throws Exception {
           send(client, event);
@@ -49,7 +52,7 @@ public final class MqttReplayPublisher implements AutoCloseable {
           closeClient(client);
         }
       };
-    }, completed);
+    }, completed, mqttVersion);
     if (pool == null) {
       cleanup.scheduleWithFixedDelay(this::closeIdleSessions, interval, interval, TimeUnit.MILLISECONDS);
     }
@@ -77,7 +80,7 @@ public final class MqttReplayPublisher implements AutoCloseable {
     String key = SessionKeyResolver.resolve(event.topic(), sessionPerTopic, sessionPrefix);
     PublishingSession session = clients.get(key);
     if (session == null) {
-      MqttClient client = connectClient(false);
+      MqttWireClient client = connectClient(false);
       session = new PublishingSession(client);
       clients.put(key, session);
     }
@@ -85,29 +88,28 @@ public final class MqttReplayPublisher implements AutoCloseable {
     session.lastPublishedNanos = System.nanoTime();
   }
 
-  private MqttClient connectClient(boolean pooled) throws Exception {
-    MqttClient client = new MqttClient(broker, "maps-mqtt-replay-" + UUID.randomUUID(), new MemoryPersistence());
-    if (pooled) {
-      client.setTimeToWait(30_000L);
-    }
+  private MqttWireClient connectClient(boolean pooled) throws Exception {
+    MqttWireClient client = MqttWireClient.create(mqttVersion, broker, "maps-mqtt-replay-" + UUID.randomUUID(),
+        pooled ? 30_000L : -1L, null, null);
     try {
-      MqttConnectOptions options = new MqttConnectOptions();
-      options.setMqttVersion(MqttConnectOptions.MQTT_VERSION_3_1_1);
-      options.setCleanSession(true);
-      options.setAutomaticReconnect(false);
-      client.connect(options);
+      client.connect();
     } catch (Exception exception) {
-      client.close();
-      throw exception;
+      try {
+        client.close();
+      } catch (Exception cleanup) {
+        exception.addSuppressed(cleanup);
+      }
+      throw new IllegalStateException("MQTT " + mqttVersion + " publishing connection failed: " + broker, exception);
     }
     return client;
   }
 
-  private static void send(MqttClient client, ReplayEvent event) throws Exception {
-    MqttMessage message = new MqttMessage(event.payload());
-    message.setQos(event.qos());
-    message.setRetained(event.retained());
-    client.publish(event.topic(), message);
+  private void send(MqttWireClient client, ReplayEvent event) throws Exception {
+    try {
+      client.publish(event);
+    } catch (Exception exception) {
+      throw new IllegalStateException("MQTT " + mqttVersion + " publish failed: " + event.topic(), exception);
+    }
   }
 
   synchronized int sessionCount() {
@@ -131,14 +133,8 @@ public final class MqttReplayPublisher implements AutoCloseable {
     }
   }
 
-  private static void closeClient(MqttClient client) throws Exception {
-    try {
-      if (client.isConnected()) {
-        client.disconnect();
-      }
-    } finally {
-      client.close();
-    }
+  private static void closeClient(MqttWireClient client) throws Exception {
+    client.close();
   }
 
   @Override
@@ -167,10 +163,10 @@ public final class MqttReplayPublisher implements AutoCloseable {
   }
 
   private static final class PublishingSession {
-    private final MqttClient client;
+    private final MqttWireClient client;
     private long lastPublishedNanos = System.nanoTime();
 
-    private PublishingSession(MqttClient client) {
+    private PublishingSession(MqttWireClient client) {
       this.client = client;
     }
   }

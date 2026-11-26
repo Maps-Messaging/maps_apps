@@ -24,6 +24,7 @@ public final class MqttReplayMain {
   }
 
   static void replay(ReplayOptions options) throws Exception {
+    System.out.println("MQTT protocol version: " + options.mqttVersion());
     long count = 0;
     long lastCompleted = 0;
     ReplayScheduler scheduler = new ReplayScheduler(options.speed(), options.noDelay());
@@ -34,7 +35,7 @@ public final class MqttReplayMain {
                if (!options.observeUrls().isEmpty()) {
                  validation.published(event);
                }
-             })) {
+             }, options.mqttVersion())) {
       validation.start();
       if (options.sessions() > 0) {
         System.out.println("Publishing with a fixed session pool; published counts indicate client publish completion, not broker ingestion at QoS 0");
@@ -55,8 +56,8 @@ public final class MqttReplayMain {
           long totalRecords = reader.totalRecords();
           long recordsRead = reader.recordsRead();
           double progress = totalRecords == 0 ? 100.0 : 100.0 * recordsRead / totalRecords;
-          System.out.printf("Published %,d events using %d sessions (%,.0f events/sec) (%.1f%% read: %,d/%,d records)%s%n",
-              completed, publisher.sessionCount(), eventsPerSecond, progress, recordsRead, totalRecords,
+          System.out.printf("Published %,d events using %d sessions (MQTT %s) (%,.0f events/sec) (%.1f%% read: %,d/%,d records)%s%n",
+              completed, publisher.sessionCount(), options.mqttVersion(), eventsPerSecond, progress, recordsRead, totalRecords,
               options.observeUrls().isEmpty() ? "" : validation.progress());
           lastCompleted = completed;
           lastReportNanos = now;

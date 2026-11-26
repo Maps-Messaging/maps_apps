@@ -8,9 +8,10 @@ import java.util.List;
 public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
                             String sessionPrefix, int qos, List<String> observeUrls,
                             String observeTopic, long drainMillis, Path report, boolean noDelay,
-                            long sessionIdleMillis, int sessions, int queueDepth, int subscriberSessions) {
+                            long sessionIdleMillis, int sessions, int queueDepth, int subscriberSessions, String mqttVersion) {
   public ReplayOptions {
     observeUrls = List.copyOf(observeUrls);
+    MqttWireClient.validateVersion(mqttVersion);
     if (subscriberSessions < 1) {
       throw new IllegalArgumentException("--subscriber-sessions must be positive");
     }
@@ -32,6 +33,14 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
         observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth, 1);
   }
 
+  public ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
+                       String sessionPrefix, int qos, List<String> observeUrls,
+                       String observeTopic, long drainMillis, Path report, boolean noDelay,
+                       long sessionIdleMillis, int sessions, int queueDepth, int subscriberSessions) {
+    this(directory, broker, speed, sessionPerTopic, sessionPrefix, qos, observeUrls,
+        observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth, subscriberSessions, "3.1.1");
+  }
+
   public static ReplayOptions parse(String[] arguments) {
     Path directory = null;
     String broker = null;
@@ -44,6 +53,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     int sessions = 0;
     int queueDepth = 100;
     int subscriberSessions = 1;
+    String mqttVersion = "3.1.1";
     List<String> observeUrls = new ArrayList<>();
     String observeTopic = "#";
     long drainMillis = 5000;
@@ -65,6 +75,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
             throw new IllegalArgumentException("--sessions must be positive");
           }
         }
+        case "--mqtt-version" -> mqttVersion = value(arguments, ++i, option);
         case "--subscriber-sessions" -> subscriberSessions = Integer.parseInt(value(arguments, ++i, option));
         case "--queue-depth" -> queueDepth = Integer.parseInt(value(arguments, ++i, option));
         case "--qos" -> qos = Integer.parseInt(value(arguments, ++i, option));
@@ -114,7 +125,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
       throw new IllegalArgumentException("--observe-topic must not be blank");
     }
     return new ReplayOptions(directory, broker, speed, sessionPerTopic, sessionPrefix, qos,
-        observeUrls, observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth, subscriberSessions);
+        observeUrls, observeTopic, drainMillis, report, noDelay, sessionIdleMillis, sessions, queueDepth, subscriberSessions, mqttVersion);
   }
 
   private static String value(String[] arguments, int index, String option) {

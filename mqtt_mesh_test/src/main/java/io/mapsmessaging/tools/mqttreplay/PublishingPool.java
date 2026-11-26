@@ -21,6 +21,7 @@ final class PublishingPool implements AutoCloseable {
     Session open(int index) throws Exception;
   }
 
+  private final String mqttVersion;
   private final List<Worker> workers = new ArrayList<>();
   private final AtomicReference<Throwable> failure = new AtomicReference<>();
   private final AtomicLong completed = new AtomicLong();
@@ -32,6 +33,11 @@ final class PublishingPool implements AutoCloseable {
   private volatile boolean draining;
 
   PublishingPool(int sessions, int capacity, SessionFactory factory, Consumer<ReplayEvent> callback) {
+    this(sessions, capacity, factory, callback, "3.1.1");
+  }
+
+  PublishingPool(int sessions, int capacity, SessionFactory factory, Consumer<ReplayEvent> callback, String mqttVersion) {
+    this.mqttVersion = mqttVersion;
     if (sessions <= 0 || capacity <= 0) {
       throw new IllegalArgumentException("Positive sessions and capacity required");
     }
@@ -153,8 +159,8 @@ final class PublishingPool implements AutoCloseable {
         }
         long last = worker.lastSuccess;
         String lastSuccess = last == 0 ? "never" : String.format("%.1f sec ago", (now - last) / 1e9);
-        System.err.printf("Degraded MQTT publishing session %d: %.1f events/sec, peer median %.1f, queue %d, last success %s, backpressure %,d, blocked %.3f sec%n",
-            worker.index, worker.rate, median, worker.queue.size(), lastSuccess,
+        System.err.printf("Degraded MQTT %s publishing session %d: %.1f events/sec, peer median %.1f, queue %d, last success %s, backpressure %,d, blocked %.3f sec%n",
+            mqttVersion, worker.index, worker.rate, median, worker.queue.size(), lastSuccess,
             worker.blockedCount.get(), blocked / 1e9);
       }
     }
@@ -249,7 +255,7 @@ final class PublishingPool implements AutoCloseable {
       }
     }
     private void recordFailure(Throwable error) {
-      failure.compareAndSet(null, new IllegalStateException("MQTT publishing session " + index + " failed", error));
+      failure.compareAndSet(null, new IllegalStateException("MQTT " + mqttVersion + " publishing session " + index + " failed", error));
     }
   }
 }

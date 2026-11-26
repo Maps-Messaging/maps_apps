@@ -2,7 +2,10 @@ package io.mapsmessaging.tools.mqttreplay;
 
 import java.util.List;
 
-record ValidationReport(long published, List<ObserverResult> observers, List<SessionResult> sessions) {
+record ValidationReport(long published, List<ObserverResult> observers, List<SessionResult> sessions, String mqttVersion) {
+  ValidationReport(long published, List<ObserverResult> observers, List<SessionResult> sessions) {
+    this(published, observers, sessions, "3.1.1");
+  }
   ValidationReport(long published, List<ObserverResult> observers) {
     this(published, observers, List.of());
   }

@@ -79,11 +79,11 @@ final class ValidationCoordinator implements AutoCloseable {
     for (int index = 0; index < names.size(); index++) {
       int broker = index / assignments.size();
       List<String> filters = assignments.get(index % assignments.size()).values();
-      MqttObservationClient client = new MqttObservationClient(names.get(index), options.observeUrls().get(broker), engine);
+      MqttObservationClient client = new MqttObservationClient(names.get(index), options.observeUrls().get(broker), engine, options.mqttVersion());
       clients.add(client);
       client.start(filters);
-      System.out.printf("Subscriber %s connected to %s, subscribed to %d filters%n",
-          names.get(index), options.observeUrls().get(broker), filters.size());
+      System.out.printf("Subscriber %s connected to %s (MQTT %s), subscribed to %d filters%n",
+          names.get(index), options.observeUrls().get(broker), options.mqttVersion(), filters.size());
     }
     for (MqttObservationClient client : clients) {
       if (!client.connected() || client.failure() != null) {
@@ -117,8 +117,8 @@ final class ValidationCoordinator implements AutoCloseable {
         }
       }
       long last = client.lastReceived();
-      status.append(String.format(" [%s: expected %,d, received %,d, matched %,d, %,.0f/s, idle %s, connected %s]",
-          name, item.expected(), item.received(), item.matched(), delta / seconds,
+      status.append(String.format(" [%s MQTT %s: expected %,d, received %,d, matched %,d, %,.0f/s, idle %s, connected %s]",
+          name, options.mqttVersion(), item.expected(), item.received(), item.matched(), delta / seconds,
           last == 0 ? "never" : TimeUnit.NANOSECONDS.toMillis(Math.max(0, now - last)) + "ms", client.connected()));
     }
     lastProgress = now;
@@ -140,7 +140,7 @@ final class ValidationCoordinator implements AutoCloseable {
     Map<String, String> errors = new LinkedHashMap<>();
     for (int i = 0; i < clients.size(); i++) {
       MqttObservationClient client = clients.get(i);
-      errors.put(names.get(i), client.failure() == null && !client.connected() ? "Disconnected" : client.failure());
+      errors.put(names.get(i), client.failure() == null && !client.connected() ? "MQTT " + options.mqttVersion() + ": Disconnected" : client.failure());
     }
     ValidationReport individual = engine.snapshot(errors);
     List<ValidationReport.SessionResult> sessions = new ArrayList<>();
@@ -174,7 +174,7 @@ final class ValidationCoordinator implements AutoCloseable {
       observers.add(new ValidationReport.ObserverResult("observer-" + (broker + 1), received, matched, missing,
           excess, unexpected, failures.isEmpty() ? null : String.join("; ", failures), keys, samples));
     }
-    ValidationReport report = new ValidationReport(individual.published(), observers, sessions);
+    ValidationReport report = new ValidationReport(individual.published(), observers, sessions, options.mqttVersion());
     String json = new GsonBuilder().setPrettyPrinting().create().toJson(report);
     System.out.println(json);
     Path reportFile = options.report();
