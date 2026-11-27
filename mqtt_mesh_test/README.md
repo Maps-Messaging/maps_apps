@@ -27,7 +27,7 @@ Both `maps-mqtt-mesh-test` and the backwards-compatible `maps-mqtt-replay` launc
 - `--sessions N`: Fixed pool of N concurrent publishing sessions, selected by the full topic hash. Preserves per-topic publish order. Mutually exclusive with `--session-per-topic` and `--session-prefix`; when omitted, existing session modes apply.
 - `--queue-depth N`: Maximum queued events per fixed-pool session (default 100). A full queue blocks the replay reader while workers continue publishing. Must be positive.
 - `--session-idle-ms`: Close idle dynamic publishing connections after this many milliseconds (default `60000`); the session is recreated on its next event. The reported session count is the number of currently open dynamic connections or configured fixed sessions.
-- `--qos`: Default QoS if absent from the recording, default `0`.
+- `--qos 0|1|2`: Force the publication QoS for every replayed event. When omitted, preserve recorded QoS, defaulting to `0` if absent. Preflight reports the effective publication QoS counts.
 - `--observe URL`: Repeatable. With no occurrences, replay-only mode has no validation overhead.
 - `--subscriber-sessions N`: Independent subscriber sessions per observation broker (default 1). Larger pools partition recorded topics by event counts; no shared subscriptions.
 - `--observe-topic`: One MQTT topic filter used on every observation point, default `#`. Use a filter that covers **every** published topic to avoid false missing-message results.

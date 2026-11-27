@@ -23,7 +23,7 @@ class NdjsonReplayDecoderTest {
         "receivedTimestamp":"2026-08-18T11:18:28.536304603Z",
         "topic":"4817/catl/maps/edge-maps-halpi-27de21dc/routetest/route-1787051904-72833-1"}
         """;
-    ReplayEvent event = NdjsonReplayDecoder.decode(line, 2);
+    ReplayEvent event = NdjsonReplayDecoder.decode(line, null);
     assertEquals("4817/catl/maps/edge-maps-halpi-27de21dc/routetest/route-1787051904-72833-1", event.topic());
     assertEquals(Instant.parse("2026-08-18T11:18:28.536304603Z"), event.timestamp());
     assertArrayEquals("route-1787051904-72833-1".getBytes(StandardCharsets.UTF_8), event.payload());
@@ -37,7 +37,7 @@ class NdjsonReplayDecoderTest {
     String line = "{\"topic\":\"sensor/data\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\","
         + "\"qualityOfService\":\"EXACTLY_ONCE\",\"retain\":true,\"opaqueData\":\""
         + Base64.getEncoder().encodeToString(payload) + "\"}";
-    ReplayEvent event = NdjsonReplayDecoder.decode(line, 1);
+    ReplayEvent event = NdjsonReplayDecoder.decode(line, null);
     assertArrayEquals(payload, event.payload());
     assertEquals(2, event.qos());
     assertTrue(event.retained());
@@ -57,9 +57,24 @@ class NdjsonReplayDecoderTest {
   void preservesLegacyJsonPayloadAndQosFields() {
     ReplayEvent event = NdjsonReplayDecoder.decode(
         "{\"topic\":\"a/b\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\","
-            + "\"qos\":\"AT_LEAST_ONCE\",\"retained\":true,\"payload\":{\"value\":42}}", 0);
+            + "\"qos\":\"AT_LEAST_ONCE\",\"retained\":true,\"payload\":{\"value\":42}}", null);
     assertArrayEquals("{\"value\":42}".getBytes(StandardCharsets.UTF_8), event.payload());
     assertEquals(1, event.qos());
     assertTrue(event.retained());
+  }
+  @Test
+  void explicitQosOverridesRecordedQos() {
+    String prefix = "{\"topic\":\"a\",\"receivedTimestamp\":\"2026-09-01T00:00:00Z\",\"payload\":1";
+    String[] fields = {"", ",\"qos\":0", ",\"qos\":1", ",\"qos\":2",
+        ",\"qualityOfService\":\"AT_MOST_ONCE\"", ",\"qualityOfService\":\"AT_LEAST_ONCE\"",
+        ",\"qualityOfService\":\"EXACTLY_ONCE\""};
+    int[] recorded = {0, 0, 1, 2, 0, 1, 2};
+    for (int i = 0; i < fields.length; i++) {
+      String line = prefix + fields[i] + "}";
+      assertEquals(recorded[i], NdjsonReplayDecoder.decode(line, null).qos());
+      for (int override = 0; override <= 2; override++) {
+        assertEquals(override, NdjsonReplayDecoder.decode(line, override).qos());
+      }
+    }
   }
 }

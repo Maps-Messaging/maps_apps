@@ -102,7 +102,7 @@ class MqttReplayMainTest {
       output.write(("\n" + large + "{\"topic\":\"bad\",\"payload\":\"" + "z".repeat(300) + "\"}\n")
           .getBytes(StandardCharsets.UTF_8));
     }
-    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 0)) {
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, null)) {
       NdjsonReplayReader.LargestPacket largest = reader.largestPacket();
       assertNotNull(largest);
       assertEquals("sensor/é", largest.topic());
@@ -112,6 +112,14 @@ class MqttReplayMainTest {
       assertEquals("b.ndjson.gz", largest.path().getFileName().toString());
       assertEquals(2L, largest.lineNumber());
       assertEquals(3L, reader.totalRecords());
+      assertArrayEquals(new long[]{1, 1, 0}, reader.qosCounts());
+    }
+    try (NdjsonReplayReader reader = new NdjsonReplayReader(directory, 0)) {
+      assertArrayEquals(new long[]{2, 0, 0}, reader.qosCounts());
+      assertEquals(0, reader.largestPacket().qos());
+      assertEquals(0, reader.next().qos());
+      assertEquals(0, reader.next().qos());
+      assertNull(reader.next());
     }
   }
 

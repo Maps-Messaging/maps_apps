@@ -60,4 +60,17 @@ class ReplayObserverOptionsTest {
     assertThrows(IllegalArgumentException.class, () -> ReplayOptions.parse(new String[]{
         "--dir", directory.toString(), "--broker", "tcp://localhost:1883", "--drain-ms", "-1"}));
   }
+  @Test
+  void distinguishesOmittedQosFromExplicitOverrides() {
+    org.junit.jupiter.api.Assertions.assertNull(ReplayOptions.parse(new String[]{
+        "--dir", directory.toString(), "--broker", "tcp://localhost:1883"}).qos());
+    for (int qos = 0; qos <= 2; qos++) {
+      assertEquals(Integer.valueOf(qos), ReplayOptions.parse(new String[]{
+          "--dir", directory.toString(), "--broker", "tcp://localhost:1883", "--qos", Integer.toString(qos)}).qos());
+    }
+    for (String invalid : new String[]{"-1", "3"}) {
+      assertThrows(IllegalArgumentException.class, () -> ReplayOptions.parse(new String[]{
+          "--dir", directory.toString(), "--broker", "tcp://localhost:1883", "--qos", invalid}));
+    }
+  }
 }

@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public record ReplayOptions(Path directory, String broker, double speed, boolean sessionPerTopic,
-                            String sessionPrefix, int qos, List<String> observeUrls,
+                            String sessionPrefix, Integer qos, List<String> observeUrls,
                             String observeTopic, long drainMillis, Path report, boolean noDelay,
                             long sessionIdleMillis, int sessions, int queueDepth, int subscriberSessions, String mqttVersion) {
   public ReplayOptions {
@@ -49,7 +49,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     long sessionIdleMillis = 60000;
     boolean sessionPerTopic = false;
     String sessionPrefix = null;
-    int qos = 0;
+    Integer qos = null;
     int sessions = 0;
     int queueDepth = 100;
     int subscriberSessions = 1;
@@ -112,7 +112,7 @@ public record ReplayOptions(Path directory, String broker, double speed, boolean
     if (sessions > 0 && (sessionPerTopic || sessionPrefix != null)) {
       throw new IllegalArgumentException("--sessions cannot be combined with dynamic session modes");
     }
-    if (qos < 0 || qos > 2) {
+    if (qos != null && (qos < 0 || qos > 2)) {
       throw new IllegalArgumentException("--qos must be 0, 1 or 2");
     }
     if (sessionIdleMillis <= 0) {

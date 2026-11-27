@@ -11,7 +11,7 @@ final class NdjsonReplayDecoder {
   private NdjsonReplayDecoder() {
   }
 
-  static ReplayEvent decode(String line, int defaultQos) {
+  static ReplayEvent decode(String line, Integer qosOverride) {
     JsonObject record = JsonParser.parseString(line).getAsJsonObject();
     if (!present(record, "topic") || record.get("topic").getAsString().isBlank()) {
       throw new IllegalArgumentException("Missing topic");
@@ -48,7 +48,7 @@ final class NdjsonReplayDecoder {
           ? payload.getAsString() : payload.toString()).getBytes(StandardCharsets.UTF_8);
     }
 
-    int qos = defaultQos;
+    int qos = 0;
     if (present(record, "qualityOfService") || present(record, "qos")) {
       String value = record.get(present(record, "qualityOfService") ? "qualityOfService" : "qos").getAsString();
       qos = switch (value) {
@@ -60,6 +60,12 @@ final class NdjsonReplayDecoder {
     }
     if (qos < 0 || qos > 2) {
       throw new IllegalArgumentException("Invalid QoS");
+    }
+    if (qosOverride != null) {
+      if (qosOverride < 0 || qosOverride > 2) {
+        throw new IllegalArgumentException("Invalid QoS");
+      }
+      qos = qosOverride;
     }
     boolean retained = present(record, "retain") ? record.get("retain").getAsBoolean()
         : present(record, "retained") && record.get("retained").getAsBoolean();

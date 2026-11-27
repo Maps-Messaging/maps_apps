@@ -23,6 +23,7 @@ import java.util.zip.GZIPInputStream;
 public final class NdjsonReplayReader implements AutoCloseable {
   private final List<Source> sources = new ArrayList<>();
   private LargestPacket largestPacket;
+  private final long[] qosCounts = new long[3];
   private final Map<String, Long> topicCounts = new HashMap<>();
 
   Map<String, Long> topicCounts() {
@@ -32,7 +33,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
       Comparator.comparing((Source source) -> source.current.timestamp())
           .thenComparingInt(source -> source.index));
 
-  NdjsonReplayReader(Path directory, int qos) throws IOException {
+  NdjsonReplayReader(Path directory, Integer qos) throws IOException {
     try {
       List<Path> files;
       try (Stream<Path> stream = Files.walk(directory)) {
@@ -46,11 +47,15 @@ public final class NdjsonReplayReader implements AutoCloseable {
       }
       List<ScanResult> scans = scanFiles(files, qos);
       for (ScanResult scan : scans) {
+        for (int level = 0; level < qosCounts.length; level++) {
+          qosCounts[level] += scan.qosCounts()[level];
+        }
         scan.topicCounts().forEach((topic, count) -> topicCounts.merge(topic, count, Long::sum));
         if (scan.largestPacket() != null && (largestPacket == null || scan.largestPacket().packetBytes() > largestPacket.packetBytes())) {
           largestPacket = scan.largestPacket();
         }
       }
+      System.out.printf("Effective publication QoS: 0=%,d, 1=%,d, 2=%,d%n", qosCounts[0], qosCounts[1], qosCounts[2]);
       if (largestPacket != null) {
         System.out.printf("Largest MQTT 3.1.1 PUBLISH packet: %,d bytes (payload %,d bytes, QoS %d), topic: %s, file: %s:%d%n",
             largestPacket.packetBytes(), largestPacket.payloadBytes(), largestPacket.qos(),
@@ -76,7 +81,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
     }
   }
 
-  private static List<ScanResult> scanFiles(List<Path> files, int qos) throws IOException {
+  private static List<ScanResult> scanFiles(List<Path> files, Integer qos) throws IOException {
     int workers = Math.min(files.size(), Math.min(Runtime.getRuntime().availableProcessors(), 8));
     ExecutorService executor = Executors.newFixedThreadPool(Math.max(1, workers));
     List<Future<ScanResult>> futures = new ArrayList<>(files.size());
@@ -118,7 +123,11 @@ public final class NdjsonReplayReader implements AutoCloseable {
   record LargestPacket(long packetBytes, int payloadBytes, int qos, String topic, Path path, long lineNumber) {
   }
 
-  private record ScanResult(long totalRecords, LargestPacket largestPacket, Map<String, Long> topicCounts) {
+  private record ScanResult(long totalRecords, LargestPacket largestPacket, Map<String, Long> topicCounts, long[] qosCounts) {
+  }
+
+  long[] qosCounts() {
+    return qosCounts.clone();
   }
 
   LargestPacket largestPacket() {
@@ -179,7 +188,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
   private static final class Source {
     private final Path path;
     private final int index;
-    private final int qos;
+    private final Integer qos;
     private final BufferedReader reader;
     private final long totalRecords;
     private long lineNumber;
@@ -187,7 +196,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
     private long skippedRecords;
     private ReplayEvent current;
 
-    Source(Path path, int index, int qos, long totalRecords) throws IOException {
+    Source(Path path, int index, Integer qos, long totalRecords) throws IOException {
       this.path = path;
       this.index = index;
       this.qos = qos;
@@ -195,12 +204,13 @@ public final class NdjsonReplayReader implements AutoCloseable {
       this.reader = open(path);
     }
 
-    private static ScanResult scan(Path path, int qos) throws IOException {
+    private static ScanResult scan(Path path, Integer qos) throws IOException {
       try (BufferedReader counter = open(path)) {
         long count = 0;
         long lineNumber = 0;
         LargestPacket largest = null;
         Map<String, Long> counts = new HashMap<>();
+        long[] qosCounts = new long[3];
         String line;
         while ((line = counter.readLine()) != null) {
           lineNumber++;
@@ -209,6 +219,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
             try {
               ReplayEvent event = NdjsonReplayDecoder.decode(line, qos);
               counts.merge(event.topic(), 1L, Long::sum);
+              qosCounts[event.qos()]++;
               long bytes = packetBytes(event);
               if (largest == null || bytes > largest.packetBytes()) {
                 largest = new LargestPacket(bytes, event.payload().length, event.qos(), event.topic(), path, lineNumber);
@@ -221,7 +232,7 @@ public final class NdjsonReplayReader implements AutoCloseable {
             throw new IOException("Interrupted while scanning " + path);
           }
         }
-        return new ScanResult(count, largest, counts);
+        return new ScanResult(count, largest, counts, qosCounts);
       }
     }
 
