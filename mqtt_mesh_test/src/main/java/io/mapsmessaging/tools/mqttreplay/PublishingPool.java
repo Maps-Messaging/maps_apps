@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 final class PublishingPool implements AutoCloseable {
   interface Session extends AutoCloseable {
     void publish(ReplayEvent event) throws Exception;
+    default String publicationDiagnostics() { return "unavailable"; }
     void close() throws Exception;
   }
 
@@ -31,6 +32,7 @@ final class PublishingPool implements AutoCloseable {
     return thread;
   });
   private volatile boolean draining;
+  private long lastDiagnosticSample = System.nanoTime();
 
   PublishingPool(int sessions, int capacity, SessionFactory factory, Consumer<ReplayEvent> callback) {
     this(sessions, capacity, factory, callback, "3.1.1");
@@ -147,6 +149,19 @@ final class PublishingPool implements AutoCloseable {
       worker.previousSample = now;
       worker.busy = !worker.queue.isEmpty() || worker.blockedSince != 0;
     }
+    if (now - lastDiagnosticSample >= TimeUnit.SECONDS.toNanos(10)) {
+      lastDiagnosticSample = now;
+      for (Worker worker : workers) {
+        Session session = worker.activeSession;
+        if (session != null) {
+          long active = worker.activeSince;
+          long ageMillis = active == 0 ? 0 : TimeUnit.NANOSECONDS.toMillis(Math.max(0L, now - active));
+          System.err.printf("Publisher %d MQTT %s: published=%,d, queued=%d, outstanding=%d, activeAgeMs=%d, %s%n",
+              worker.index, mqttVersion, worker.published.get(), worker.queue.size(), active == 0 ? 0 : 1, ageMillis,
+              session.publicationDiagnostics());
+        }
+      }
+    }
     for (Worker worker : workers) {
       double[] peers = workers.stream().filter(peer -> peer != worker && (peer.busy || peer.utilisation >= 0.5) && peer.rate > 0)
           .mapToDouble(peer -> peer.rate).sorted().toArray();
@@ -196,7 +211,8 @@ final class PublishingPool implements AutoCloseable {
     private final AtomicLong blockedNanos = new AtomicLong();
     private volatile long blockedSince;
     private volatile long lastSuccess;
-    private long activeSince;
+    private volatile long activeSince;
+    private volatile Session activeSession;
     private long totalBusyNanos;
     private long previousBusyNanos;
     private double utilisation;
@@ -230,6 +246,7 @@ final class PublishingPool implements AutoCloseable {
     @Override
     public void run() {
       try (Session session = factory.open(index)) {
+        activeSession = session;
         try {
           while (failure.get() == null && (!draining || !queue.isEmpty())) {
             ReplayEvent event = queue.poll(100, TimeUnit.MILLISECONDS);
@@ -249,6 +266,8 @@ final class PublishingPool implements AutoCloseable {
         } catch (Throwable error) {
           recordFailure(error);
           throw error;
+        } finally {
+          activeSession = null;
         }
       } catch (Throwable error) {
         recordFailure(error);

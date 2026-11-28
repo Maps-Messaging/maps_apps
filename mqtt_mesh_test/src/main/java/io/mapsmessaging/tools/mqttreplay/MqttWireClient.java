@@ -36,5 +36,6 @@ interface MqttWireClient extends AutoCloseable {
   void publish(ReplayEvent event) throws Exception;
   void subscribe(String filter, int qos) throws Exception;
   boolean isConnected();
+  String publicationDiagnostics();
   void close() throws Exception;
 }

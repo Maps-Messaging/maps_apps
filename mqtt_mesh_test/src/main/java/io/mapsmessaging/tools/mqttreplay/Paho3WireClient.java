@@ -14,6 +14,7 @@ final class Paho3WireClient implements MqttWireClient {
   private final MqttAsyncClient client;
   private final String version;
   private final long timeout;
+  private int maxInflight;
 
   Paho3WireClient(String version, String url, String id, long timeout,
                   BiConsumer<String, byte[]> received, Consumer<String> disconnected) throws Exception {
@@ -49,6 +50,7 @@ final class Paho3WireClient implements MqttWireClient {
     options.setMqttVersion("3.1".equals(version) ? MqttConnectOptions.MQTT_VERSION_3_1 : MqttConnectOptions.MQTT_VERSION_3_1_1);
     options.setCleanSession(true);
     options.setAutomaticReconnect(false);
+    maxInflight = options.getMaxInflight();
     await(client.connect(options));
   }
 
@@ -60,6 +62,20 @@ final class Paho3WireClient implements MqttWireClient {
     IMqttToken token = client.subscribe(filter, qos);
     await(token);
     MqttWireClient.requireSuback(filter, qos, token.getGrantedQos());
+  }
+
+  public String publicationDiagnostics() {
+    try {
+      IMqttDeliveryToken[] tokens = client.getPendingDeliveryTokens();
+      String ids = java.util.Arrays.stream(tokens)
+          .map(token -> token.getMessageId() + ":" + token.isComplete())
+          .collect(java.util.stream.Collectors.joining(","));
+      return "client=" + client.getClientId() + ", connected=" + client.isConnected()
+          + ", pending=" + tokens.length + ", inFlight=" + client.getInFlightMessageCount()
+          +  ", maxInflight=" + maxInflight +  ", tokens(id:complete)=[" + ids + "]";
+    } catch (RuntimeException failure) {
+      return "diagnostics unavailable: " + failure;
+    }
   }
 
   public boolean isConnected() {

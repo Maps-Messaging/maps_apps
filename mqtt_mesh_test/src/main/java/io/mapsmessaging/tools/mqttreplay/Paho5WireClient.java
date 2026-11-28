@@ -81,6 +81,20 @@ final class Paho5WireClient implements MqttWireClient {
     MqttWireClient.requireSuback(filter, qos, token.getReasonCodes());
   }
 
+  public String publicationDiagnostics() {
+    try {
+      IMqttToken[] tokens = client.getPendingTokens();
+      String ids = java.util.Arrays.stream(tokens)
+          .map(token -> token.getMessageId() + ":" + token.isComplete())
+          .collect(java.util.stream.Collectors.joining(","));
+      return "client=" + client.getClientId() + ", connected=" + client.isConnected()
+          + ", pending=" + tokens.length + ", inFlight=" + client.getInFlightMessageCount()
+          +  ", tokens(id:complete)=[" + ids + "]";
+    } catch (RuntimeException failure) {
+      return "diagnostics unavailable: " + failure;
+    }
+  }
+
   public boolean isConnected() {
     return client.isConnected();
   }

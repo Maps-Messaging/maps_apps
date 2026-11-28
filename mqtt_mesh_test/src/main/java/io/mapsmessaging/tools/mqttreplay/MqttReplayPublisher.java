@@ -48,6 +48,10 @@ public final class MqttReplayPublisher implements AutoCloseable {
           send(client, event);
         }
 
+        public String publicationDiagnostics() {
+          return client.publicationDiagnostics();
+        }
+
         public void close() throws Exception {
           closeClient(client);
         }
@@ -108,6 +112,7 @@ public final class MqttReplayPublisher implements AutoCloseable {
     try {
       client.publish(event);
     } catch (Exception exception) {
+      System.err.println("Publisher failure before close: " + client.publicationDiagnostics());
       throw new IllegalStateException("MQTT " + mqttVersion + " publish failed: " + event.topic(), exception);
     }
   }
